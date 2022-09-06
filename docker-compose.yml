@@ -1,0 +1,24 @@
+version: '3.8'
+services:
+    astm-http-bridge:
+        container_name: astm-http-bridge 
+        build: .
+        image: astm-http-bridge
+        ports:
+            - "8442:8443"
+            - "12000:12001"
+            - "8000:8000"
+        volumes:
+            - ./configuration.yml:/app/configuration.yml
+        logging:
+            driver: "local"
+            options:
+              max-size: "20m"
+              max-file: "50"
+        healthcheck:
+            test: ["CMD", "/app/healthcheck.sh"]
+            timeout: 10s
+            interval: 30s
+            retries: 3
+            start_period: 2m
+    

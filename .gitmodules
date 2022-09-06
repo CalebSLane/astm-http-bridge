@@ -1,0 +1,3 @@
+[submodule "astm-http-lib"]
+	path = astm-http-lib
+	url = https://github.com/CalebSLane/astm-http-lib.git
