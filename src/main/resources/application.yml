@@ -7,3 +7,11 @@ server:
 #    key-store-password: password
   http:
     port: 8080
+    
+management:
+  endpoints:
+    web:
+      exposure:
+        include: loggers
+    loggers:
+      enabled: true

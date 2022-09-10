@@ -6,6 +6,7 @@ import java.util.List;
 import javax.servlet.http.HttpServletResponse;
 
 import org.itech.ahb.config.properties.ASTMForwardServerConfigurationProperties;
+import org.itech.ahb.lib.astm.servlet.ASTMHandlerMarshaller;
 import org.itech.ahb.lib.common.ASTMInterpreterFactory;
 import org.itech.ahb.lib.common.ASTMMessage;
 import org.itech.ahb.lib.common.DefaultASTMMessage;
@@ -28,9 +29,10 @@ public class HTTPListenController {
 	private final HTTPHandlerMarshaller httpHandlerMarshaller;
 
 	public HTTPListenController(ASTMInterpreterFactory interpreterFactory,
-			ASTMForwardServerConfigurationProperties astmForwardConfig) {
+			ASTMForwardServerConfigurationProperties astmForwardConfig, ASTMHandlerMarshaller astmHandlerMarshaller) {
 		List<HTTPHandler> httpHandlers = Arrays.asList(new DefaultForwardingHTTPToASTMHandler(
-				astmForwardConfig.getHostName(), astmForwardConfig.getPort(), interpreterFactory));
+				astmForwardConfig.getHostName(), astmForwardConfig.getPort(), astmHandlerMarshaller,
+				interpreterFactory));
 		this.httpHandlerMarshaller = new HTTPHandlerMarshaller(httpHandlers);
 	}
 

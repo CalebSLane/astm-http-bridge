@@ -7,7 +7,6 @@ services:
         ports:
             - "8442:8443"
             - "12000:12001"
-            - "8000:8000"
         volumes:
             - ./configuration.yml:/app/configuration.yml
         logging:

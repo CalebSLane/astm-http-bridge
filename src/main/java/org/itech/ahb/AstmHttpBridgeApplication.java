@@ -1,6 +1,5 @@
 package org.itech.ahb;
 
-import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 
@@ -8,6 +7,7 @@ import org.itech.ahb.config.YamlPropertySourceFactory;
 import org.itech.ahb.config.properties.ASTMListenServerConfigurationProperties;
 import org.itech.ahb.config.properties.HTTPForwardServerConfigurationProperties;
 import org.itech.ahb.lib.astm.servlet.ASTMHandler;
+import org.itech.ahb.lib.astm.servlet.ASTMHandlerMarshaller;
 import org.itech.ahb.lib.astm.servlet.ASTMServlet;
 import org.itech.ahb.lib.astm.servlet.DefaultForwardingASTMToHTTPHandler;
 import org.itech.ahb.lib.common.ASTMInterpreterFactory;
@@ -36,23 +36,26 @@ public class AstmHttpBridgeApplication {
 
 	@Bean
 	public ASTMInterpreterFactory astmInterpreterFactory() {
-		return new DefaultASTMInterpreterFactory(); 
+		return new DefaultASTMInterpreterFactory();
+	}
+
+	@Bean
+	public ASTMHandlerMarshaller astmHandlerMarshaller(HTTPForwardServerConfigurationProperties httpForwardConfig) {
+		List<ASTMHandler> astmHandlers;
+		if (StringUtils.hasText(httpForwardConfig.getUsername())) {
+			astmHandlers = Arrays.asList(new DefaultForwardingASTMToHTTPHandler(httpForwardConfig.getUri()));
+		} else {
+			astmHandlers = Arrays.asList(new DefaultForwardingASTMToHTTPHandler(httpForwardConfig.getUri()));
+		}
+		return new ASTMHandlerMarshaller(astmHandlers);
 	}
 
 	@Bean
 	public ASTMServlet astmServlet(ASTMListenServerConfigurationProperties astmListenConfig,
 			HTTPForwardServerConfigurationProperties httpForwardConfig) {
 		log.info("creating astm server bean to handle incoming astm requests on port " + astmListenConfig.getPort());
-		List<ASTMHandler> astmHandlers;
-
-		if (StringUtils.hasText(httpForwardConfig.getUsername())) {
-			astmHandlers = Arrays.asList(new DefaultForwardingASTMToHTTPHandler(httpForwardConfig.getUri()));
-		} else {
-			astmHandlers = Arrays.asList(new DefaultForwardingASTMToHTTPHandler(httpForwardConfig.getUri()));
-		}
-
-		astmHandlers = new ArrayList<>();
-		return new ASTMServlet(astmHandlers, astmInterpreterFactory(), astmListenConfig.getPort());
+		return new ASTMServlet(astmHandlerMarshaller(httpForwardConfig), astmInterpreterFactory(),
+				astmListenConfig.getPort());
 	}
 
 }
