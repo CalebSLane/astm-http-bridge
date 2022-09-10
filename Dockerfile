@@ -11,6 +11,7 @@ RUN apt-get -y install git
 #
 ADD .git /build/.git
 ADD .gitmodules /build/.gitmodules
+WORKDIR /build/
 RUN git submodule update --init --recursive
 
 ##

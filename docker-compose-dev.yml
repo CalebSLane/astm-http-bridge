@@ -4,7 +4,7 @@ services:
         container_name: astm-http-bridge 
         build:
             context: .
-            dockerfile: ./Dockerfile
+            dockerfile: ./Dockerfile.dev
         image: astm-http-bridge
         ports:
             - "8442:8443"
