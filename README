@@ -1,3 +1,13 @@
 To build and deploy this project for development, run the following command in the top-level directory of the project:
 
-sudo docker compose -f docker-compose-dev.yml up -d --build
+`sudo docker compose -f docker-compose-dev.yml up -d --build`
+
+* Note, the project will not commence startup in dev mode until a debugger is attached on port 8000
+
+To build and deploy this project normally, run the following command in the top-level directory of the project:
+
+`sudo docker compose up -d --build`
+
+to view logging of running container, run:
+
+`sudo docker logs --follow astm-http-bridge`
