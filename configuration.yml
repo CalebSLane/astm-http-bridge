@@ -1,0 +1,10 @@
+org:
+  itech:
+    ahb:
+      forward-astm-server:
+        hostName: 10.0.0.103
+        port: 12001
+logging:
+  level:
+    root: ERROR
+    org.itech: DEBUG

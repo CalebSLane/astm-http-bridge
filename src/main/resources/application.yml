@@ -1,17 +1,11 @@
-server:
-  port: 8443
-#  ssl:
-#    enabled: true
-#    keyStoreType: PKCS12
-#    key-store: /path/to/keystore.p12
-#    key-store-password: password
-  http:
-    port: 8080
+spring:
+  profiles: 
+    active: prod
     
 management:
   endpoints:
     web:
       exposure:
-        include: loggers
+        include: loggers, health
     loggers:
       enabled: true

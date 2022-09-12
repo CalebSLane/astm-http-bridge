@@ -13,7 +13,8 @@ services:
         volumes:
             - ./configuration.yml:/app/configuration.yml
         environment:
-            JAVA_OPTS: "-agentlib:jdwp=transport=dt_socket,server=y,suspend=y,address=*:8000"
+            SPRING_PROFILE: dev
+            JAVA_OPTS: -agentlib:jdwp=transport=dt_socket,server=y,suspend=y,address=*:8000
         logging:
             driver: "local"
             options:

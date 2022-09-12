@@ -1,9 +1,13 @@
 #!/bin/sh
 
-
-if curl --fail --silent -k http://localhost:8080/actuator/health | grep UP 
+if curl --fail --silent -k https://localhost:8443/actuator/health | grep UP 
 then 
 	exit 0;
 else
-	exit 1;
+	if curl --fail --silent http://localhost:8443/actuator/health | grep UP 
+	then 
+		exit 0;
+	else
+		exit 1;
+	fi
 fi

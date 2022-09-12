@@ -1,0 +1,7 @@
+server:
+  port: 8443
+  ssl:
+    enabled: true
+    keyStoreType: ${server.ssl.keyStoreType}
+    key-store: ${server.ssl.keyStorePath}
+    key-store-password: ${server.ssl.keyStorePassword}
