@@ -43,7 +43,8 @@ public class AstmHttpBridgeApplication {
 	public ASTMHandlerMarshaller astmHandlerMarshaller(HTTPForwardServerConfigurationProperties httpForwardConfig) {
 		List<ASTMHandler> astmHandlers;
 		if (StringUtils.hasText(httpForwardConfig.getUsername())) {
-			astmHandlers = Arrays.asList(new DefaultForwardingASTMToHTTPHandler(httpForwardConfig.getUri()));
+			astmHandlers = Arrays.asList(new DefaultForwardingASTMToHTTPHandler(httpForwardConfig.getUri(),
+					httpForwardConfig.getUsername(), httpForwardConfig.getPassword()));
 		} else {
 			astmHandlers = Arrays.asList(new DefaultForwardingASTMToHTTPHandler(httpForwardConfig.getUri()));
 		}

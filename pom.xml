@@ -9,7 +9,7 @@
 	</parent>
 	<groupId>org.itech</groupId>
 	<artifactId>astm-http-bridge</artifactId>
-	<version>0.0.1-SNAPSHOT</version>
+	<version>1.0.0</version>
 	<name>astm-http-bridge</name>
 	<description>Translates astm to http and vice versa</description>
 	<properties>
@@ -28,7 +28,7 @@
 		<dependency>
 			<groupId>org.itech</groupId>
 			<artifactId>astm-http-lib</artifactId>
-			<version>0.0.1-SNAPSHOT</version>
+			<version>1.0.0</version>
 		</dependency>
 		<dependency>
 			<groupId>org.springframework.boot</groupId>
