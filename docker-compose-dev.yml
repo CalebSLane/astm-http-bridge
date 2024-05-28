@@ -12,9 +12,16 @@ services:
             - "8000:8000"
         volumes:
             - ./configuration.yml:/app/configuration.yml
+            - /home/caleb/projects/UW-Projects/OpenELIS-Global-2/dev/https/int.caleb.dev.openelisci.org.truststore.p12:/etc/truststore 
+        extra_hosts:
+            - "host.openelis.org:10.0.0.101"
         environment:
             SPRING_PROFILE: dev
-            JAVA_OPTS: -agentlib:jdwp=transport=dt_socket,server=y,suspend=y,address=*:8000
+            LOGGING_LEVEL_ORG_ITECH: DEBUG 
+            JAVA_OPTS: "-agentlib:jdwp=transport=dt_socket,server=y,suspend=y,address=*:8000 
+              -Djavax.net.ssl.trustStore=/etc/truststore
+              -Djavax.net.ssl.trustStorePassword=testtest
+              -Djavax.net.ssl.trustStoreType=PKCS12"
         logging:
             driver: "local"
             options:
@@ -26,4 +33,6 @@ services:
             interval: 30s
             retries: 3
             start_period: 2m
+            
+  
     
