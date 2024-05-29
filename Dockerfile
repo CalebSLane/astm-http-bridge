@@ -1,7 +1,7 @@
 ##
 # Build Stage
 #
-FROM maven:3-jdk-11 as build
+FROM maven:3.9.7-eclipse-temurin-21-jammy as build
 
 RUN apt-get -y update
 RUN apt-get -y install git
@@ -33,12 +33,7 @@ RUN mvn clean package -DskipTests
 ##
 # Run Stage
 #
-FROM alpine:3.16
-
-RUN  apk update \
-  && apk upgrade \
-  && apk add --update openjdk11 curl bash \
-  && rm -rf /var/cache/apk/*
+FROM eclipse-temurin:21-jre-alpine
 
 RUN addgroup -S astm --gid 9257 && adduser -S astm -s /bin/bash -u 9257 -G astm
 RUN mkdir /app

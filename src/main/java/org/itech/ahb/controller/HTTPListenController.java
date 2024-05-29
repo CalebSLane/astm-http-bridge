@@ -4,7 +4,7 @@ import java.util.Arrays;
 import java.util.List;
 import java.util.Set;
 
-import javax.servlet.http.HttpServletResponse;
+import jakarta.servlet.http.HttpServletResponse;
 
 import org.itech.ahb.config.properties.ASTMForwardServerConfigurationProperties;
 import org.itech.ahb.lib.astm.servlet.ASTMHandlerMarshaller;
