@@ -1,38 +1,39 @@
-version: '3.8'
+version: "3.8"
+
+x-logging: &local-logging
+  driver: "local"
+  options:
+    max-size: "20m"
+    max-file: "50"
+
 services:
-    astm-http-bridge:
-        container_name: astm-http-bridge 
-        build:
-            context: .
-            dockerfile: ./Dockerfile.dev
-        image: astm-http-bridge
-        ports:
-            - "8442:8443"
-            - "12000:12001"
-            - "8000:8000"
-        volumes:
-            - ./configuration.yml:/app/configuration.yml
-            - /home/caleb/projects/UW-Projects/OpenELIS-Global-2/dev/https/int.caleb.dev.openelisci.org.truststore.p12:/etc/truststore 
-        extra_hosts:
-            - "host.openelis.org:10.0.0.101"
-        environment:
-            SPRING_PROFILE: dev
-            LOGGING_LEVEL_ORG_ITECH: DEBUG 
-            JAVA_OPTS: "-agentlib:jdwp=transport=dt_socket,server=y,suspend=y,address=*:8000 
-              -Djavax.net.ssl.trustStore=/etc/truststore
-              -Djavax.net.ssl.trustStorePassword=testtest
-              -Djavax.net.ssl.trustStoreType=PKCS12"
-        logging:
-            driver: "local"
-            options:
-              max-size: "20m"
-              max-file: "50"
-        healthcheck:
-            test: ["CMD", "/app/healthcheck.sh"]
-            timeout: 10s
-            interval: 30s
-            retries: 3
-            start_period: 2m
-            
-  
-    
+  astm-http-bridge:
+    container_name: astm-http-bridge
+    build:
+      context: .
+      dockerfile: ./Dockerfile.dev
+    image: astm-http-bridge
+    ports:
+      - "8442:8443"
+      - "12000:12001"
+      - "8000:8000"
+    volumes:
+      - ./configuration.yml:/app/configuration.yml
+      - /home/caleb/projects/UW-Projects/OpenELIS-Global-2/dev/https/int.caleb.dev.openelisci.org.truststore.p12:/etc/truststore
+    extra_hosts:
+      - "host.openelis.org:10.0.0.101"
+    environment:
+      SPRING_PROFILE: dev
+      LOGGING_LEVEL_ORG_ITECH: DEBUG
+      JAVA_OPTS:
+        "-agentlib:jdwp=transport=dt_socket,server=y,suspend=y,address=*:8000
+        -Djavax.net.ssl.trustStore=/etc/truststore
+        -Djavax.net.ssl.trustStorePassword=testtest
+        -Djavax.net.ssl.trustStoreType=PKCS12"
+    logging: *local-logging
+    healthcheck:
+      test: ["CMD", "/app/healthcheck.sh"]
+      timeout: 10s
+      interval: 30s
+      retries: 3
+      start_period: 2m

@@ -8,14 +8,14 @@ import org.springframework.stereotype.Component;
 @Component
 public class SpringASTMServer {
 
-	private ASTMServlet server;
+  private ASTMServlet server;
 
-	public SpringASTMServer(ASTMServlet server) {
-		this.server = server;
-	}
+  public SpringASTMServer(ASTMServlet server) {
+    this.server = server;
+  }
 
-	@Async
-	public void listen() {
-		server.listen();
-	}
+  @Async
+  public void listen() {
+    server.listen();
+  }
 }
