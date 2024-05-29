@@ -36,3 +36,4 @@ build/
 .project
 .classpath
 bin
+node_modules
