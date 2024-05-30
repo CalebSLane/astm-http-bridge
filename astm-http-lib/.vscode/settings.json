@@ -1,0 +1,14 @@
+{
+    "java.compile.nullAnalysis.mode": "automatic",
+    "editor.codeActionsOnSave": {
+        "source.fixAll.eslint": "explicit"
+    },
+    "eslint.validate": [
+        "javascript"
+    ],
+    "java.configuration.updateBuildConfiguration": "automatic",
+    "java.completion.importOrder": ["#"],
+    "java.project.sourcePaths": [
+        "src/main/java"
+    ]
+}

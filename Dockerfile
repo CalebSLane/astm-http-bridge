@@ -11,20 +11,13 @@ RUN --mount=target=/var/lib/apt/lists,type=cache,sharing=locked \
   git
 
 ##
-# Copy Source Code
+# Copy Source Code and Build Dependencies
 #
-ADD .git /build/.git
-ADD .gitmodules /build/.gitmodules
-WORKDIR /build/
-RUN --mount=target=/tmp/git_cache/,type=cache,sharing=locked \
-  git submodule update --init --recursive
-
-##
-# Build Dependencies
-#
+ADD ./astm-http-lib/pom.xml /build/astm-http-lib/pom.xml
 WORKDIR /build/astm-http-lib
 RUN --mount=type=cache,target=/root/.m2,sharing=locked \
   mvn dependency:go-offline 
+ADD ./astm-http-lib/src /build/astm-http-lib/src
 RUN --mount=type=cache,target=/root/.m2,sharing=locked \
   mvn clean install -DskipTests
 
