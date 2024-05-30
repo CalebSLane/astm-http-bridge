@@ -58,5 +58,5 @@ jobs:
             ${{ steps.meta.outputs.tags }}
             ${{ env.DOCKER_NAME }}:latest
           labels: ${{ steps.meta.outputs.labels }}
-          cache-from: type=registry,ref=${{github.repository}}:latest
-          cache-to: type=inline
+          cache-from: type=registry,ref=${{ env.DOCKER_NAME }}:buildcache
+          cache-to: type=registry,ref=${{ env.DOCKER_NAME }}:buildcache,mode=max
