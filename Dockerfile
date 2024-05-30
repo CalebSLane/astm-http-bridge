@@ -3,8 +3,12 @@
 #
 FROM maven:3.9.7-eclipse-temurin-21-jammy as build
 
-RUN apt-get -y update
-RUN apt-get -y install git
+RUN --mount=target=/var/lib/apt/lists,type=cache,sharing=locked \
+  --mount=target=/var/cache/apt,type=cache,sharing=locked \
+  rm -f /etc/apt/apt.conf.d/docker-clean \
+  && apt-get -y update \
+  && apt-get -y --no-install-recommends install \
+  git
 
 ##
 # Copy Source Code
