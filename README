@@ -4,7 +4,7 @@ To build and deploy this project for development, run the following command in t
 
 - Note, the project will not commence startup in dev mode until a debugger is attached on port 8000
 
-To build and deploy this project normally using the latest image on dockerhub, run the following command in the top-level directory of the project:
+To build and deploy this project normally using the latest image on Docker Hub, run the following command in the top-level directory of the project:
 
 `sudo docker compose up -d --build`
 
