@@ -16,15 +16,16 @@ RUN --mount=target=/var/lib/apt/lists,type=cache,sharing=locked \
 ADD .git /build/.git
 ADD .gitmodules /build/.gitmodules
 WORKDIR /build/
-RUN git submodule update --init --recursive
+RUN --mount=target=/tmp/git_cache/,type=cache,sharing=locked \
+  git submodule update --init --recursive
 
 ##
 # Build Dependencies
 #
 WORKDIR /build/astm-http-lib
-RUN --mount=type=cache,target=/root/.m2 \
+RUN --mount=type=cache,target=/root/.m2,sharing=locked \
   mvn dependency:go-offline 
-RUN --mount=type=cache,target=/root/.m2 \
+RUN --mount=type=cache,target=/root/.m2,sharing=locked \
   mvn clean install -DskipTests
 
 ##
