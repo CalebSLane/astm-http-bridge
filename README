@@ -11,3 +11,5 @@ To build and deploy this project normally using the latest image on Docker Hub, 
 to view logging of running container, run:
 
 `sudo docker logs --follow astm-http-bridge`
+
+configuration.yml should contain any configuration parameters that a user wants to pass in
