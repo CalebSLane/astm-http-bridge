@@ -12,4 +12,4 @@ to view logging of running container, run:
 
 `sudo docker logs --follow astm-http-bridge`
 
-configuration.yml should contain any configuration parameters that a user wants to pass in
+`configuration.yml` should contain any configuration parameters that a user wants to pass to the application.
