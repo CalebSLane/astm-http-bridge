@@ -22,17 +22,21 @@ RUN git submodule update --init --recursive
 # Build Dependencies
 #
 WORKDIR /build/astm-http-lib
-RUN mvn dependency:go-offline
-RUN mvn clean install -DskipTests
+RUN --mount=type=cache,target=/root/.m2 \
+  mvn dependency:go-offline 
+RUN --mount=type=cache,target=/root/.m2 \
+  mvn clean install -DskipTests
 
 ##
 # Build Project
 #
 WORKDIR /build
 ADD ./pom.xml /build/pom.xml
-RUN mvn dependency:go-offline
+RUN --mount=type=cache,target=/root/.m2 \
+  mvn dependency:go-offline   
 ADD ./src /build/src
-RUN mvn clean package -DskipTests
+RUN --mount=type=cache,target=/root/.m2 \
+  mvn clean package -DskipTests
 
 ##
 # Run Stage
