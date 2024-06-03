@@ -30,6 +30,7 @@ import org.itech.ahb.lib.common.ASTMInterpreterFactory;
 import org.itech.ahb.lib.common.ASTMMessage;
 import org.itech.ahb.lib.common.exception.ASTMCommunicationException;
 import org.itech.ahb.lib.common.exception.FrameParsingException;
+import org.itech.ahb.lib.util.LogUtil;
 
 @Slf4j
 public class LIS01A2Communicator implements Closeable {
@@ -169,8 +170,16 @@ public class LIS01A2Communicator implements Closeable {
         log.debug("attempting retry of frame " + i);
       }
       char startChar = (char) reader.read();
+      log.trace(
+        "received: '" +
+        LogUtil.convertForDisplay(startChar) +
+        "'. Expecting start of frame ['" +
+        LogUtil.convertForDisplay(STX) +
+        "'] aka [0x02]"
+      );
       if (startChar == EOT) {
         eotDetected = true;
+        log.debug("'" + LogUtil.convertForDisplay(EOT) + "' detected");
       } else {
         final Future<Set<FrameError>> recievedFrameFuture = executor.submit(receiveNextFrameTask(frames));
         try {
@@ -182,12 +191,14 @@ public class LIS01A2Communicator implements Closeable {
           }
           if (frameErrors.isEmpty()) {
             log.debug("frame successfully received");
+            log.trace("sending: '" + LogUtil.convertForDisplay(ACK) + "' to indicate received frame correctly");
             writer.append(ACK);
             writer.flush();
             exceptions = new ArrayList<>(); // reset as retry mechanism is per frame
             ++i;
           } else {
             log.debug("frame unsuccessfully received due to: " + frameErrors);
+            log.trace("sending: '" + LogUtil.convertForDisplay(NAK) + "' to indicate received frame incorrectly");
             writer.append(NAK);
             writer.flush();
             exceptions.add(new ASTMCommunicationException("frame unsuccessfully received due to: " + frameErrors));
@@ -217,11 +228,26 @@ public class LIS01A2Communicator implements Closeable {
     return new Callable<Boolean>() {
       @Override
       public Boolean call() throws IOException {
-        if ((char) reader.read() == ENQ) {
+        char establishmentChar = (char) reader.read();
+        log.trace(
+          "received: '" +
+          LogUtil.convertForDisplay(establishmentChar) +
+          "'. Expecting establishment signal [" +
+          LogUtil.convertForDisplay(ENQ) +
+          "] aka [0x05]"
+        );
+
+        if (establishmentChar == ENQ) {
+          log.trace("sending: '" + LogUtil.convertForDisplay(ACK) + "' to indicate ready to receive frames");
           writer.append(ACK);
           writer.flush();
           return true;
         } else {
+          log.trace(
+            "sending: '" +
+            LogUtil.convertForDisplay(NAK) +
+            "' to indicate not ready to receive frames. Incorrect establishment signal"
+          );
           writer.append(NAK);
           writer.flush();
           return false;
@@ -243,11 +269,13 @@ public class LIS01A2Communicator implements Closeable {
     log.debug("reading frame...");
     Set<FrameError> frameErrors = new HashSet<>();
     char frameNumberChar = (char) reader.read();
+    log.trace("received: '" + LogUtil.convertForDisplay(frameNumberChar) + "'. Expecting frame number [0-7]");
 
     if (expectedFrameNumber != Character.getNumericValue(frameNumberChar)) {
       frameErrors.add(FrameError.WRONG_FRAME_NUMBER);
     }
     char curChar = (char) reader.read();
+
     int frameSize = 0;
     StringBuilder textBuilder = new StringBuilder();
     while (curChar != ETB && curChar != ETX) {
@@ -264,7 +292,20 @@ public class LIS01A2Communicator implements Closeable {
     boolean finalFrame = (curChar == ETX);
     String text = textBuilder.toString();
     log.debug("frame text received");
-    log.trace("received frame: '" + text + "'");
+    log.trace(
+      "received frame: '" +
+      LogUtil.convertForDisplay(text) +
+      "'. Expecting ASTM record. Illegal characters [0x00-0x06, 0x08, 0x0A, 0x0E-0x1F, 0x7F, 0xFF]"
+    );
+    log.trace(
+      "received: '" +
+      LogUtil.convertForDisplay(curChar) +
+      "'. Expecting control code indicating end of text ['" +
+      LogUtil.convertForDisplay(ETB) +
+      "', '" +
+      LogUtil.convertForDisplay(ETX) +
+      "'] aka [0x17, 0x03]"
+    );
     StringBuilder checksum = new StringBuilder();
     checksum.append((char) reader.read());
     checksum.append((char) reader.read());
@@ -273,12 +314,25 @@ public class LIS01A2Communicator implements Closeable {
     if (!checksumFits(checksum.toString(), frameNumberChar, text, curChar)) {
       frameErrors.add(FrameError.BAD_CHECKSUM);
     }
-    if (CR != (char) reader.read()) {
+    String endFrameControlCode = "";
+    char endOfFrameChar = (char) reader.read();
+    endFrameControlCode = endFrameControlCode + endOfFrameChar;
+    if (CR != endOfFrameChar) {
       frameErrors.add(FrameError.ILLEGAL_END);
     }
-    if (LF != (char) reader.read()) {
+    endOfFrameChar = (char) reader.read();
+    endFrameControlCode = endFrameControlCode + endOfFrameChar;
+    if (LF != endOfFrameChar) {
       frameErrors.add(FrameError.ILLEGAL_END);
     }
+    log.trace(
+      "received:'" +
+      LogUtil.convertForDisplay(endFrameControlCode) +
+      "'. Expecting control code indicating end of frame ['" +
+      LogUtil.convertForDisplay("" + CR + LF) +
+      "'] aka [0x0D0x0A]"
+    );
+
     if (frameErrors.isEmpty()) {
       ASTMFrame frame = new ASTMFrame();
       frame.setFrameNumber(Character.getNumericValue(frameNumberChar));
@@ -353,6 +407,11 @@ public class LIS01A2Communicator implements Closeable {
       }
 
       char response = (char) reader.read();
+      log.trace(
+        "received: '" +
+        LogUtil.convertForDisplay(response) +
+        "'. Expecting frame acknownledgment [ACK, NAK, EOT] aka [0x06, 0x15, 0x04]"
+      );
       if (response == ACK) {
         exceptions = new ArrayList<>();
         continue;
@@ -383,9 +442,21 @@ public class LIS01A2Communicator implements Closeable {
     return new Callable<Character>() {
       @Override
       public Character call() throws IOException {
+        log.trace("sending: '" + LogUtil.convertForDisplay(ENQ) + "' as establishment signal");
         writer.append(ENQ);
         writer.flush();
         char response = (char) reader.read();
+        log.trace(
+          "received: '" +
+          LogUtil.convertForDisplay(response) +
+          "'. Expecting establishment response ['" +
+          LogUtil.convertForDisplay(ACK) +
+          "', '" +
+          LogUtil.convertForDisplay(NAK) +
+          "', '" +
+          LogUtil.convertForDisplay(ENQ) +
+          "'] aka [0x06, 0x15, 0x04]"
+        );
         if (response == ACK) {
           return ACK;
         } else if (response == NAK) {
@@ -415,7 +486,7 @@ public class LIS01A2Communicator implements Closeable {
           .append(CR) //
           .append(LF);
         String frame = frameBuilder.toString();
-        log.trace("sending frame: '" + frame + "'");
+        log.trace("sending frame: '" + LogUtil.convertForDisplay(frame) + "'");
         writer.append(frame);
         writer.flush();
 
@@ -425,13 +496,15 @@ public class LIS01A2Communicator implements Closeable {
   }
 
   private void terminationSignal() {
-    log.debug("sending termination for exchange");
+    log.debug("sending '" + LogUtil.convertForDisplay(EOT) + "' as termination for exchange");
     writer.append(EOT);
     writer.flush();
   }
 
   private boolean checksumFits(String checksum, char frameNumber, String frame, char frameTerminator) {
-    log.debug("received checksum value is: " + checksum);
+    log.trace(
+      "received: '" + LogUtil.convertForDisplay(checksum) + "'. Expecting 2 base 16 checksum characters [00-FF]"
+    );
     return checksum.equals(checksumCalc(frameNumber, frame, frameTerminator));
   }
 
