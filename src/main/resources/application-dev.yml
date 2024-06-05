@@ -1,5 +1,9 @@
 server:
   port: 8443
+management:
+  endpoint:
+    health:
+      show-details: always
 #  ssl:
 #    enabled: true
 #    keyStoreType: ${server.ssl.keyStoreType}
