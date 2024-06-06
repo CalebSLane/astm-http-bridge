@@ -8,29 +8,44 @@ import org.itech.ahb.lib.common.ASTMInterpreterFactory;
 @Slf4j
 public class ASTMServlet {
 
+  public enum ASTMVersion {
+    LIS01_A,
+    E1381_95,
+    NON_COMPLIANT
+  }
+
   private final ASTMHandlerMarshaller astmMessageMarshaller;
   private final ASTMInterpreterFactory astmInterpreterFactory;
   private final int listenPort;
+  private final ASTMVersion astmVersion;
 
   public ASTMServlet(
     ASTMHandlerMarshaller astmMessageMarshaller,
     ASTMInterpreterFactory astmInterpreterFactory,
-    int listenPort
+    int listenPort,
+    ASTMVersion astmVersion
   ) {
     this.astmMessageMarshaller = astmMessageMarshaller;
     this.astmInterpreterFactory = astmInterpreterFactory;
     this.listenPort = listenPort;
+    this.astmVersion = astmVersion;
   }
 
   public void listen() {
     try (ServerSocket serverSocket = new ServerSocket(listenPort)) {
-      log.info("Server is listening on port " + listenPort + " for ASTM protocol messages");
+      log.info("Server is listening on port " + listenPort + " for ASTM protocol: " + astmVersion + " messages");
       // Communication Endpoint for the client and server.
       while (true) {
         // Waiting for socket connection
         Socket s = serverSocket.accept();
-        new ASTMReceiveThread(s, astmInterpreterFactory, astmMessageMarshaller).start();
+        new ASTMReceiveThread(
+          new GeneralASTMCommunicator(astmInterpreterFactory, s.getInputStream(), s.getOutputStream(), astmVersion),
+          s,
+          astmMessageMarshaller
+        ).start();
       }
-    } catch (Exception e) {}
+    } catch (Exception e) {
+      log.error("an exception caused the astm server to shut down", e);
+    }
   }
 }

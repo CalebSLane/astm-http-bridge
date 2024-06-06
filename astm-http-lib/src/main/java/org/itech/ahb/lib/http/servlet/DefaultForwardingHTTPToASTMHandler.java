@@ -7,7 +7,9 @@ import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang3.StringUtils;
 import org.itech.ahb.lib.astm.servlet.ASTMHandlerMarshaller;
 import org.itech.ahb.lib.astm.servlet.ASTMReceiveThread;
-import org.itech.ahb.lib.astm.servlet.LIS01A2Communicator;
+import org.itech.ahb.lib.astm.servlet.ASTMServlet.ASTMVersion;
+import org.itech.ahb.lib.astm.servlet.Communicator;
+import org.itech.ahb.lib.astm.servlet.GeneralASTMCommunicator;
 import org.itech.ahb.lib.common.ASTMInterpreterFactory;
 import org.itech.ahb.lib.common.ASTMMessage;
 import org.itech.ahb.lib.common.DefaultASTMMessage;
@@ -20,6 +22,7 @@ public class DefaultForwardingHTTPToASTMHandler implements HTTPHandler {
 
   private final String defaultForwardingAddress;
   private final int defaultForwardingPort;
+  private final ASTMVersion defaultForwardingProtocol;
   private final ASTMInterpreterFactory interpreterFactory;
   private final ASTMHandlerMarshaller astmHandlerMarshaller; // this is necessary in case of line contention
 
@@ -31,6 +34,7 @@ public class DefaultForwardingHTTPToASTMHandler implements HTTPHandler {
   ) {
     this.defaultForwardingAddress = forwardingAddress;
     this.defaultForwardingPort = forwardingPort;
+    this.defaultForwardingProtocol = ASTMVersion.LIS01_A;
     this.interpreterFactory = interpreterFactory;
     this.astmHandlerMarshaller = astmHandlerMarshaller;
   }
@@ -40,9 +44,10 @@ public class DefaultForwardingHTTPToASTMHandler implements HTTPHandler {
     Socket socket = null;
     boolean success = false;
     boolean closeSocket = true;
-    LIS01A2Communicator communicator = null;
+    Communicator communicator = null;
     String forwardingAddress = this.defaultForwardingAddress;
     int forwardingPort = this.defaultForwardingPort;
+    ASTMVersion forwardingProtocol = this.defaultForwardingProtocol;
     for (HTTPHandlerInfo handlerInfo : handlerInfos) {
       if (handlerInfo instanceof HttpForwardingHandlerInfo) {
         HttpForwardingHandlerInfo httpForwardingHandlerInfo = (HttpForwardingHandlerInfo) handlerInfo;
@@ -52,15 +57,21 @@ public class DefaultForwardingHTTPToASTMHandler implements HTTPHandler {
         forwardingPort = httpForwardingHandlerInfo.getForwardPort() <= 0
           ? forwardingPort
           : httpForwardingHandlerInfo.getForwardPort();
+        forwardingProtocol = httpForwardingHandlerInfo.getForwardAstmVersion() == null
+          ? forwardingProtocol
+          : httpForwardingHandlerInfo.getForwardAstmVersion();
       }
     }
     try {
       log.debug("connecting to forward to astm server at " + forwardingAddress + ":" + forwardingPort);
       socket = new Socket(forwardingAddress, forwardingPort);
       log.debug("connected to astm server at " + forwardingAddress + ":" + forwardingPort);
-
-      log.debug("forwarding to astm server at " + forwardingAddress + ":" + forwardingPort);
-      communicator = new LIS01A2Communicator(interpreterFactory, socket);
+      communicator = new GeneralASTMCommunicator(
+        interpreterFactory,
+        socket.getInputStream(),
+        socket.getOutputStream(),
+        forwardingProtocol
+      );
       log.debug(
         "successfully created communicator " +
         communicator.getID() +
@@ -82,7 +93,7 @@ public class DefaultForwardingHTTPToASTMHandler implements HTTPHandler {
         receiveThread.start();
 
         if (message.getMessageLength() == 0) {
-          log.info("since message request was empty, it is assumed this was a ping to trigger an action");
+          log.info("since original message request was empty, it is assumed this was a ping to trigger an action");
           success = true;
         }
       }
@@ -91,19 +102,6 @@ public class DefaultForwardingHTTPToASTMHandler implements HTTPHandler {
       return HandleStatus.FAIL;
     } finally {
       if (closeSocket) {
-        if (communicator != null) {
-          try {
-            communicator.close();
-            log.debug(
-              "successfully closed communicator with astm server at " + forwardingAddress + ":" + forwardingPort
-            );
-          } catch (IOException e) {
-            log.error(
-              "error occurred closing communicator with astm server at " + forwardingAddress + ":" + forwardingPort,
-              e
-            );
-          }
-        }
         if (socket != null && !socket.isClosed()) {
           try {
             socket.close();

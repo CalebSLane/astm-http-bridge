@@ -1,13 +1,11 @@
 package org.itech.ahb.lib.astm.servlet;
 
 import java.io.BufferedReader;
-import java.io.Closeable;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.io.OutputStream;
 import java.io.PrintWriter;
-import java.net.Socket;
 import java.nio.charset.Charset;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
@@ -24,16 +22,19 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicInteger;
 import lombok.extern.slf4j.Slf4j;
+import org.itech.ahb.lib.astm.servlet.ASTMServlet.ASTMVersion;
 import org.itech.ahb.lib.common.ASTMFrame;
 import org.itech.ahb.lib.common.ASTMFrame.FrameType;
 import org.itech.ahb.lib.common.ASTMInterpreterFactory;
 import org.itech.ahb.lib.common.ASTMMessage;
+import org.itech.ahb.lib.common.ASTMRecord;
 import org.itech.ahb.lib.common.exception.ASTMCommunicationException;
 import org.itech.ahb.lib.common.exception.FrameParsingException;
 import org.itech.ahb.lib.util.LogUtil;
 
+//If this class gets too complicated, separate out the LISA-01 and E1382-95 protocols
 @Slf4j
-public class LIS01A2Communicator implements Closeable {
+public class GeneralASTMCommunicator implements Communicator {
 
   public enum FrameError {
     WRONG_FRAME_NUMBER,
@@ -78,21 +79,22 @@ public class LIS01A2Communicator implements Closeable {
     DC3,
     DC4
   );
+  private static final char NON_COMPLIANT_START_CHARACTER = 'H';
 
+  public static final int OVERHEAD_CHARACTER_COUNT = 7;
   public static final int MAX_FRAME_SIZE = 64000;
-  public static final int MAX_TEXT_SIZE = MAX_FRAME_SIZE - 7;
-
-  private static final int ESTABLISHMENT_SEND_TIMEOUT = 150; // in seconds
-  private static final int ESTABLISHMENT_RECEIVE_TIMEOUT = 200; // in seconds
-  private static final int RECIEVE_FRAME_TIMEOUT = 300; // in seconds
-  private static final int SEND_FRAME_TIMEOUT = 300; // in seconds
-
+  public static final int MAX_TEXT_SIZE = MAX_FRAME_SIZE - OVERHEAD_CHARACTER_COUNT;
+  private static final int ESTABLISHMENT_SEND_TIMEOUT = 15; // in seconds
+  private static final int ESTABLISHMENT_RECEIVE_TIMEOUT = 20; // in seconds
+  private static final int RECIEVE_FRAME_TIMEOUT = 30; // in seconds
+  private static final int SEND_FRAME_TIMEOUT = 15; // in seconds
   private static final int MAX_RECEIVE_RETRY_ATTEMPTS = 3;
-
   private static final int MAX_SEND_ESTABLISH_RETRY_ATTEMPTS = 3;
-  private static final int SEND_ATTEMPTS_WAIT = 100; // in seconds
-
+  private static final int SEND_ATTEMPTS_WAIT = 10; // in seconds
   private static final int MAX_FRAME_RETRY_ATTEMPTS = 5;
+
+  public static final int MAX_FRAME_SIZE_E138195 = 247;
+  public static final int MAX_TEXT_SIZE_E138195 = MAX_FRAME_SIZE_E138195 - OVERHEAD_CHARACTER_COUNT;
 
   // wrapping counter
   private static final AtomicInteger COMMUNICATOR_ID_COUNTER = new AtomicInteger(0);
@@ -109,59 +111,150 @@ public class LIS01A2Communicator implements Closeable {
   private final ASTMInterpreterFactory astmInterpreterFactory;
   private final String communicatorId; // only used for debug messages
 
-  private final Socket socket;
   private final BufferedReader reader;
   private final PrintWriter writer;
+  private ASTMVersion astmVersion;
 
-  public LIS01A2Communicator(ASTMInterpreterFactory astmInterpreterFactory, Socket socket) throws IOException {
+  public GeneralASTMCommunicator(ASTMInterpreterFactory astmInterpreterFactory, InputStream input, OutputStream output)
+    throws IOException {
+    this(astmInterpreterFactory, input, output, ASTMVersion.LIS01_A);
+  }
+
+  public GeneralASTMCommunicator(
+    ASTMInterpreterFactory astmInterpreterFactory,
+    InputStream input,
+    OutputStream output,
+    ASTMVersion astmVersion
+  ) throws IOException {
     communicatorId = Integer.toString(incrementAndGetId());
-
-    InputStream input = socket.getInputStream();
     BufferedReader reader = new BufferedReader(new InputStreamReader(input, StandardCharsets.UTF_8));
-
-    OutputStream outputStream = socket.getOutputStream();
-    PrintWriter writer = new PrintWriter(outputStream, true);
+    PrintWriter writer = new PrintWriter(output, true);
 
     this.astmInterpreterFactory = astmInterpreterFactory;
     this.reader = reader;
     this.writer = writer;
-    this.socket = socket;
+    this.astmVersion = astmVersion;
   }
 
+  @Override
   public String getID() {
     return communicatorId;
   }
 
-  public List<ASTMMessage> receiveProtocol() throws FrameParsingException, ASTMCommunicationException, IOException {
-    log.trace("starting receiveProtocol for ASTM message");
+  @Override
+  public ASTMMessage receiveProtocol() throws FrameParsingException, ASTMCommunicationException, IOException {
+    log.trace("starting receive protocol for ASTM message");
+    if (astmVersion == ASTMVersion.LIS01_A) {
+      final Future<Boolean> establishedFuture = executor.submit(establishmentTaskReceive());
+      Boolean established = false;
+      try {
+        established = establishedFuture.get(ESTABLISHMENT_RECEIVE_TIMEOUT, TimeUnit.SECONDS);
+      } catch (TimeoutException e) {
+        establishedFuture.cancel(true);
+        executor.shutdown();
+        throw new ASTMCommunicationException(
+          "a timeout occured during the establishment phase of the receive protocol",
+          e
+        );
+      } catch (InterruptedException | ExecutionException e) {
+        executor.shutdown();
+        throw new ASTMCommunicationException(
+          "the establishment phase of the receive protocol was interrupted or had an error in execution",
+          e
+        );
+      }
+      if (!established) {
+        executor.shutdown();
+        throw new ASTMCommunicationException(
+          "something went wrong in the establishment phase of the receive protocol, possibly the wrong start character was received"
+        );
+      }
+
+      log.trace("astm LIS01-A receive protocol: established");
+      return receiveInCompliantMode();
+    }
+    log.trace("astm 1381-95 being received");
+    return receiveInNonCompliantMode();
+  }
+
+  private Callable<Boolean> establishmentTaskReceive() {
+    return new Callable<Boolean>() {
+      @Override
+      public Boolean call() throws IOException {
+        char establishmentChar = (char) reader.read();
+        log.trace(
+          "received: '" +
+          LogUtil.convertForDisplay(establishmentChar) +
+          "'. Expecting establishment signal [" +
+          LogUtil.convertForDisplay(ENQ) +
+          "] aka [0x05]"
+        );
+
+        if (establishmentChar == ENQ) {
+          log.trace("sending: '" + LogUtil.convertForDisplay(ACK) + "' to indicate ready to receive frames");
+          writer.append(ACK);
+          writer.flush();
+          return true;
+        } else if (establishmentChar == NON_COMPLIANT_START_CHARACTER) {
+          log.debug(
+            "protocol assumed to be non-compliant as '" +
+            LogUtil.convertForDisplay(establishmentChar) +
+            "' was sent. Attempting to read message in non-compliant mode'"
+          );
+          astmVersion = ASTMVersion.NON_COMPLIANT;
+          return true;
+        } else {
+          log.trace(
+            "sending: '" +
+            LogUtil.convertForDisplay(NAK) +
+            "' to indicate not ready to receive frames. Incorrect establishment signal"
+          );
+          writer.append(NAK);
+          writer.flush();
+          return false;
+        }
+      }
+    };
+  }
+
+  private ASTMMessage receiveInNonCompliantMode()
+    throws IOException, ASTMCommunicationException, FrameParsingException {
+    List<ASTMRecord> records = new ArrayList<>();
+    boolean messageTerminationRecordReceived = false;
+    int i = 0;
+    List<Exception> exceptions = new ArrayList<>();
+    while (!messageTerminationRecordReceived && exceptions.size() <= MAX_RECEIVE_RETRY_ATTEMPTS) {
+      if (exceptions.size() > 0) {
+        log.debug("attempting retry of record " + i);
+      }
+      try {
+        Set<FrameError> frameErrors = readNextIncompliantRecord(records);
+        if (frameErrors.isEmpty()) {
+          log.debug("record successfully received");
+          exceptions = new ArrayList<>(); // reset as retry mechanism is per record
+          ++i;
+        } else {
+          log.debug("frame unsuccessfully received due to: " + frameErrors);
+          exceptions.add(new ASTMCommunicationException("frame unsuccessfully received due to: " + frameErrors));
+        }
+      } catch (Exception e) {
+        log.error("the receiving phase had an error in exeuction", e);
+        exceptions.add(e);
+      }
+    }
+
+    if (exceptions.size() > MAX_RECEIVE_RETRY_ATTEMPTS) {
+      executor.shutdown();
+      throw new ASTMCommunicationException(
+        "the receiving phase failed or had exceptions exceeding the number of retries"
+      );
+    }
+
+    return astmInterpreterFactory.createInterpreterForRecords(records).interpretASTMRecordsToMessage(records);
+  }
+
+  private ASTMMessage receiveInCompliantMode() throws IOException, ASTMCommunicationException, FrameParsingException {
     List<ASTMFrame> frames = new ArrayList<>();
-
-    final Future<Boolean> establishedFuture = executor.submit(establishmentTaskReceive());
-    Boolean established = false;
-    try {
-      established = establishedFuture.get(ESTABLISHMENT_RECEIVE_TIMEOUT, TimeUnit.SECONDS);
-    } catch (TimeoutException e) {
-      establishedFuture.cancel(true);
-      executor.shutdown();
-      throw new ASTMCommunicationException(
-        "a timeout occured during the establishment phase of the receive protocol",
-        e
-      );
-    } catch (InterruptedException | ExecutionException e) {
-      executor.shutdown();
-      throw new ASTMCommunicationException(
-        "the establishment phase of the receive protocol was interrupted or had an error in execution",
-        e
-      );
-    }
-    if (!established) {
-      executor.shutdown();
-      throw new ASTMCommunicationException(
-        "something went wrong in the establishment phase of the receive protocol, possibly the wrong start character was received"
-      );
-    }
-    log.trace("receiveProtocol: established");
-
     boolean eotDetected = false;
     int i = 0;
     List<Exception> exceptions = new ArrayList<>();
@@ -221,51 +314,19 @@ public class LIS01A2Communicator implements Closeable {
       );
     }
 
-    return astmInterpreterFactory.createInterpreter(frames).interpretFramesToASTMMessages(frames);
-  }
-
-  private Callable<Boolean> establishmentTaskReceive() {
-    return new Callable<Boolean>() {
-      @Override
-      public Boolean call() throws IOException {
-        char establishmentChar = (char) reader.read();
-        log.trace(
-          "received: '" +
-          LogUtil.convertForDisplay(establishmentChar) +
-          "'. Expecting establishment signal [" +
-          LogUtil.convertForDisplay(ENQ) +
-          "] aka [0x05]"
-        );
-
-        if (establishmentChar == ENQ) {
-          log.trace("sending: '" + LogUtil.convertForDisplay(ACK) + "' to indicate ready to receive frames");
-          writer.append(ACK);
-          writer.flush();
-          return true;
-        } else {
-          log.trace(
-            "sending: '" +
-            LogUtil.convertForDisplay(NAK) +
-            "' to indicate not ready to receive frames. Incorrect establishment signal"
-          );
-          writer.append(NAK);
-          writer.flush();
-          return false;
-        }
-      }
-    };
+    return astmInterpreterFactory.createInterpreterForFrames(frames).interpretFramesToASTMMessage(frames);
   }
 
   private Callable<Set<FrameError>> receiveNextFrameTask(List<ASTMFrame> frames) throws IOException {
     return new Callable<Set<FrameError>>() {
       @Override
       public Set<FrameError> call() throws IOException {
-        return readNextFrame(frames, (frames.size() + 1) % 8);
+        return readNextCompliantFrame(frames, (frames.size() + 1) % 8);
       }
     };
   }
 
-  private Set<FrameError> readNextFrame(List<ASTMFrame> frames, int expectedFrameNumber) throws IOException {
+  private Set<FrameError> readNextCompliantFrame(List<ASTMFrame> frames, int expectedFrameNumber) throws IOException {
     log.debug("reading frame...");
     Set<FrameError> frameErrors = new HashSet<>();
     char frameNumberChar = (char) reader.read();
@@ -282,7 +343,7 @@ public class LIS01A2Communicator implements Closeable {
       if (RESTRICTED_CHARACTERS.contains(curChar)) {
         frameErrors.add(FrameError.ILLEGAL_CHAR);
       }
-      if (MAX_TEXT_SIZE < frameSize) {
+      if ((astmVersion == ASTMVersion.LIS01_A ? MAX_TEXT_SIZE : MAX_TEXT_SIZE_E138195) < frameSize) {
         frameErrors.add(FrameError.MAX_SIZE_EXCEEDED);
       }
       textBuilder.append(curChar);
@@ -344,6 +405,35 @@ public class LIS01A2Communicator implements Closeable {
     return frameErrors;
   }
 
+  private Set<FrameError> readNextIncompliantRecord(List<ASTMRecord> records) throws IOException {
+    log.debug("reading incompliant record...");
+    Set<FrameError> frameErrors = new HashSet<>();
+    StringBuilder textBuilder = new StringBuilder();
+    char curChar = ' ';
+    while (curChar != CR) {
+      curChar = (char) reader.read();
+      if (RESTRICTED_CHARACTERS.contains(curChar)) {
+        frameErrors.add(FrameError.ILLEGAL_CHAR);
+      }
+      textBuilder.append(curChar);
+    }
+    String text = textBuilder.toString();
+    log.debug("record text received");
+    log.trace(
+      "received frame: '" +
+      LogUtil.convertForDisplay(text) +
+      "'. Expecting ASTM record. Illegal characters [0x00-0x06, 0x08, 0x0A, 0x0E-0x1F, 0x7F, 0xFF]"
+    );
+
+    if (frameErrors.isEmpty()) {
+      ASTMRecord record = astmInterpreterFactory.createInterpreterForText(text).interpretASTMTextToRecord(text);
+      records.add(record);
+      log.debug("frame added to list of frames");
+    }
+    return frameErrors;
+  }
+
+  @Override
   public boolean sendProtocol(ASTMMessage message) throws ASTMCommunicationException, IOException {
     log.trace("starting sendProtocol for ASTM message");
 
@@ -519,13 +609,5 @@ public class LIS01A2Communicator implements Closeable {
     String checksum = String.format("%02X", computedChecksum);
     log.debug("frame number " + frameNumber + " calculated checksum: " + checksum);
     return checksum;
-  }
-
-  @Override
-  public void close() throws IOException {
-    if (socket != null && socket.isClosed()) {
-      socket.close();
-    }
-    log.debug("successfully closed communicator " + getID());
   }
 }

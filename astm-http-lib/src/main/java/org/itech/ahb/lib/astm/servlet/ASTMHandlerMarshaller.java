@@ -11,10 +11,17 @@ import org.itech.ahb.lib.common.HandleStatus;
 @Slf4j
 public class ASTMHandlerMarshaller {
 
-  private List<ASTMHandler> handlers;
+  public enum MarshallerMode {
+    ALL,
+    FIRST
+  }
 
-  public ASTMHandlerMarshaller(List<ASTMHandler> handlers) {
+  private List<ASTMHandler> handlers;
+  private MarshallerMode mode;
+
+  public ASTMHandlerMarshaller(List<ASTMHandler> handlers, MarshallerMode mode) {
     this.handlers = handlers;
+    this.mode = mode;
   }
 
   public HandleStatus handle(ASTMMessage message) {
@@ -24,7 +31,9 @@ public class ASTMHandlerMarshaller {
       if (handler.matches(message)) {
         log.debug("handler found for astm message: " + message.hashCode());
         messageHandlers.put(message, handler);
-        break;
+        if (mode == MarshallerMode.FIRST) {
+          break;
+        }
       }
     }
     if (!messageHandlers.containsKey(message)) {

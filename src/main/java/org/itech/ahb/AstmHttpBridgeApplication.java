@@ -4,11 +4,14 @@ import java.util.Arrays;
 import java.util.List;
 import lombok.extern.slf4j.Slf4j;
 import org.itech.ahb.config.YamlPropertySourceFactory;
-import org.itech.ahb.config.properties.ASTMListenServerConfigurationProperties;
+import org.itech.ahb.config.properties.ASTME138195ListenServerConfigurationProperties;
+import org.itech.ahb.config.properties.ASTMLIS1AListenServerConfigurationProperties;
 import org.itech.ahb.config.properties.HTTPForwardServerConfigurationProperties;
 import org.itech.ahb.lib.astm.servlet.ASTMHandler;
 import org.itech.ahb.lib.astm.servlet.ASTMHandlerMarshaller;
+import org.itech.ahb.lib.astm.servlet.ASTMHandlerMarshaller.MarshallerMode;
 import org.itech.ahb.lib.astm.servlet.ASTMServlet;
+import org.itech.ahb.lib.astm.servlet.ASTMServlet.ASTMVersion;
 import org.itech.ahb.lib.astm.servlet.DefaultForwardingASTMToHTTPHandler;
 import org.itech.ahb.lib.common.ASTMInterpreterFactory;
 import org.itech.ahb.lib.common.DefaultASTMInterpreterFactory;
@@ -54,19 +57,36 @@ public class AstmHttpBridgeApplication {
     } else {
       astmHandlers = Arrays.asList(new DefaultForwardingASTMToHTTPHandler(httpForwardConfig.getUri()));
     }
-    return new ASTMHandlerMarshaller(astmHandlers);
+    return new ASTMHandlerMarshaller(astmHandlers, MarshallerMode.FIRST);
   }
 
   @Bean
-  public ASTMServlet astmServlet(
-    ASTMListenServerConfigurationProperties astmListenConfig,
+  public ASTMServlet astmLIS01AServlet(
+    ASTMLIS1AListenServerConfigurationProperties astmListenConfig,
     HTTPForwardServerConfigurationProperties httpForwardConfig
   ) {
-    log.info("creating astm server bean to handle incoming astm requests on port " + astmListenConfig.getPort());
+    log.info("creating astm server bean to handle incoming astm LIS1-A requests on port " + astmListenConfig.getPort());
     return new ASTMServlet(
       astmHandlerMarshaller(httpForwardConfig),
       astmInterpreterFactory(),
-      astmListenConfig.getPort()
+      astmListenConfig.getPort(),
+      ASTMVersion.LIS01_A
+    );
+  }
+
+  @Bean
+  public ASTMServlet astmE138195Servlet(
+    ASTME138195ListenServerConfigurationProperties astmListenConfig,
+    HTTPForwardServerConfigurationProperties httpForwardConfig
+  ) {
+    log.info(
+      "creating astm 1381-95 server bean to handle incoming astm 1381-95 requests on port " + astmListenConfig.getPort()
+    );
+    return new ASTMServlet(
+      astmHandlerMarshaller(httpForwardConfig),
+      astmInterpreterFactory(),
+      astmListenConfig.getPort(),
+      ASTMVersion.E1381_95
     );
   }
 }

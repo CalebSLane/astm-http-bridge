@@ -6,16 +6,10 @@ import org.springframework.stereotype.Component;
 
 //wrapper class so that we can take advantage of Spring's async handling
 @Component
-public class SpringASTMServer {
-
-  private ASTMServlet server;
-
-  public SpringASTMServer(ASTMServlet server) {
-    this.server = server;
-  }
+public class ASTMServerRunner {
 
   @Async
-  public void listen() {
+  public void run(ASTMServlet server) {
     server.listen();
   }
 }

@@ -14,10 +14,17 @@ import org.itech.ahb.lib.common.exception.FrameParsingException;
 @Slf4j
 public class HTTPHandlerMarshaller {
 
-  private List<HTTPHandler> handlers;
+  public enum MarshallerMode {
+    ALL,
+    FIRST
+  }
 
-  public HTTPHandlerMarshaller(List<HTTPHandler> handlers) {
+  private List<HTTPHandler> handlers;
+  private MarshallerMode mode;
+
+  public HTTPHandlerMarshaller(List<HTTPHandler> handlers, MarshallerMode mode) {
     this.handlers = handlers;
+    this.mode = mode;
   }
 
   public HandleStatus handle(ASTMMessage message) {
@@ -31,7 +38,9 @@ public class HTTPHandlerMarshaller {
       if (handler.matches(message)) {
         log.debug("handler found for astm http message: " + message.hashCode());
         messageHandlers.put(message, handler);
-        break;
+        if (mode == MarshallerMode.FIRST) {
+          break;
+        }
       }
     }
     if (!messageHandlers.containsKey(message)) {
