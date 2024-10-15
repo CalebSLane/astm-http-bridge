@@ -142,14 +142,26 @@ public class GeneralASTMCommunicator implements Communicator {
   }
 
   @Override
-  public ASTMMessage receiveProtocol() throws FrameParsingException, ASTMCommunicationException, IOException {
+  public ASTMMessage receiveProtocol(boolean lineWasContentious)
+    throws FrameParsingException, ASTMCommunicationException, IOException {
     log.trace("starting receive protocol for ASTM message");
     if (astmVersion == ASTMVersion.LIS01_A) {
       final Future<Boolean> establishedFuture = executor.submit(establishmentTaskReceive());
       Boolean established = false;
       try {
-        established = establishedFuture.get(ESTABLISHMENT_RECEIVE_TIMEOUT, TimeUnit.SECONDS);
+        established = establishedFuture.get(
+          lineWasContentious ? ESTABLISHMENT_RECEIVE_TIMEOUT : ESTABLISHMENT_SEND_TIMEOUT,
+          TimeUnit.SECONDS
+        );
       } catch (TimeoutException e) {
+        log.warn(
+          "waited " +
+          ESTABLISHMENT_SEND_TIMEOUT +
+          " " +
+          TimeUnit.SECONDS +
+          " for the sender to send anything but nothing was received"
+        );
+        // attempt sending information?
         establishedFuture.cancel(true);
         executor.shutdown();
         throw new ASTMCommunicationException(

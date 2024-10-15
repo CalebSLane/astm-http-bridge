@@ -8,5 +8,6 @@ import org.itech.ahb.lib.common.exception.FrameParsingException;
 public interface Communicator {
   String getID();
   boolean sendProtocol(ASTMMessage message) throws ASTMCommunicationException, IOException;
-  ASTMMessage receiveProtocol() throws FrameParsingException, ASTMCommunicationException, IOException;
+  ASTMMessage receiveProtocol(boolean lineWasContentious)
+    throws FrameParsingException, ASTMCommunicationException, IOException;
 }
