@@ -1,7 +1,7 @@
 ##
 # Build Stage
 #
-FROM maven:3.9.7-eclipse-temurin-21-jammy as build
+FROM maven:3.9.7-eclipse-temurin-21-jammy AS build
 
 RUN --mount=target=/var/lib/apt/lists,type=cache,sharing=locked \
   --mount=target=/var/cache/apt,type=cache,sharing=locked \

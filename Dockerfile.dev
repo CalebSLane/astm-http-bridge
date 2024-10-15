@@ -1,7 +1,7 @@
 ##
 # Build Stage
 #
-FROM maven:3.9.7-eclipse-temurin-21-jammy as build
+FROM maven:3.9.7-eclipse-temurin-21-jammy AS build
 
 RUN apt-get -y update
 
