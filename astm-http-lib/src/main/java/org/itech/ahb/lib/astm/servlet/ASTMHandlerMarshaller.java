@@ -1,10 +1,15 @@
 package org.itech.ahb.lib.astm.servlet;
 
+import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
+import java.util.Optional;
 import lombok.extern.slf4j.Slf4j;
+import org.apache.commons.lang3.tuple.Pair;
+import org.itech.ahb.lib.astm.ASTMHandlerResponse;
 import org.itech.ahb.lib.common.ASTMMessage;
 import org.itech.ahb.lib.common.HandleStatus;
 
@@ -24,35 +29,49 @@ public class ASTMHandlerMarshaller {
     this.mode = mode;
   }
 
-  public HandleStatus handle(ASTMMessage message) {
-    Map<ASTMMessage, ASTMHandler> messageHandlers = new HashMap<>();
+  public ASTMMarshallerResponse handle(ASTMMessage message) {
+    Map<ASTMMessage, List<ASTMHandler>> messageHandlersMap = new HashMap<>();
     log.debug("finding a handler for astm message: " + message.hashCode());
     for (ASTMHandler handler : handlers) {
       if (handler.matches(message)) {
-        log.debug("handler found for astm message: " + message.hashCode());
-        messageHandlers.put(message, handler);
+        log.debug("handler: '" + handler.getName() + "' found for astm message: " + message.hashCode());
+        List<ASTMHandler> matchingMessageHandlers = messageHandlersMap.getOrDefault(message, new ArrayList<>());
+        matchingMessageHandlers.add(handler);
+        messageHandlersMap.put(message, matchingMessageHandlers);
         if (mode == MarshallerMode.FIRST) {
+          log.debug("marshall mode is FIRST, proceeding with a single handler");
           break;
         }
       }
     }
-    if (!messageHandlers.containsKey(message)) {
+    if (!messageHandlersMap.containsKey(message)) {
       log.warn("astm message received but no handler was configured to handle the message");
+      log.debug("finished handling astm messages");
+      return new ASTMMarshallerResponse();
     }
 
+    List<ASTMHandlerResponse> handleResponses = new ArrayList<>();
     log.debug("handling astm message...");
-    for (Entry<ASTMMessage, ASTMHandler> messageHandler : messageHandlers.entrySet()) {
-      try {
-        HandleStatus status = messageHandler.getValue().handle(messageHandler.getKey());
-        log.debug("finished handling http astm message");
-        return status;
-      } catch (RuntimeException e) {
-        log.error("unexpected error occurred during handling astm message: " + messageHandler.getKey(), e);
-        return HandleStatus.FAIL;
-        // TODO add some handle exception handling. retry queue? db save?
+    for (Entry<ASTMMessage, List<ASTMHandler>> matchingMessageHandlers : messageHandlersMap.entrySet()) {
+      for (ASTMHandler messageHandler : matchingMessageHandlers.getValue()) {
+        try {
+          ASTMHandlerResponse handleResponse = messageHandler.handle(matchingMessageHandlers.getKey());
+          log.debug("'" + messageHandler.getName() + "' finished handling http astm message");
+          handleResponses.add(handleResponse);
+        } catch (RuntimeException e) {
+          log.error(
+            "unexpected error occurred during '" +
+            messageHandler.getName() +
+            "' handling astm message: " +
+            matchingMessageHandlers.getKey(),
+            e
+          );
+          handleResponses.add(new ASTMHandlerResponse("", HandleStatus.FAIL, false, messageHandler));
+          // TODO add some handle exception handling. retry queue? db save?
+          // handler.handleError();
+        }
       }
     }
-    log.debug("finished handling astm messages");
-    return HandleStatus.UNHANDLED;
+    return new ASTMMarshallerResponse(handleResponses);
   }
 }

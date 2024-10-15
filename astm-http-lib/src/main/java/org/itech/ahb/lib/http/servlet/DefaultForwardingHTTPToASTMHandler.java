@@ -89,7 +89,7 @@ public class DefaultForwardingHTTPToASTMHandler implements HTTPHandler {
         // the communicator must remain open to receive the line contention. The thread
         // will close the socket
         closeSocket = false;
-        ASTMReceiveThread receiveThread = new ASTMReceiveThread(communicator, astmHandlerMarshaller);
+        ASTMReceiveThread receiveThread = new ASTMReceiveThread(communicator, socket, astmHandlerMarshaller);
         receiveThread.start();
 
         if (message.getMessageLength() == 0) {

@@ -8,9 +8,11 @@ import java.net.http.HttpRequest.Builder;
 import java.net.http.HttpResponse;
 import java.util.Base64;
 import lombok.extern.slf4j.Slf4j;
+import org.itech.ahb.lib.astm.ASTMHandlerResponse;
 import org.itech.ahb.lib.common.ASTMMessage;
 import org.itech.ahb.lib.common.DefaultASTMMessage;
 import org.itech.ahb.lib.common.HandleStatus;
+import org.itech.ahb.lib.util.LogUtil;
 
 @Slf4j
 public class DefaultForwardingASTMToHTTPHandler implements ASTMHandler {
@@ -32,7 +34,7 @@ public class DefaultForwardingASTMToHTTPHandler implements ASTMHandler {
   }
 
   @Override
-  public HandleStatus handle(ASTMMessage message) {
+  public ASTMHandlerResponse handle(ASTMMessage message) {
     HttpClient client = HttpClient.newHttpClient();
     log.debug("creating request to forward to http server at " + forwardingUri.toString());
     Builder requestBuilder = HttpRequest.newBuilder() //
@@ -50,17 +52,25 @@ public class DefaultForwardingASTMToHTTPHandler implements ASTMHandler {
     try {
       log.debug("forwarding request to http server at " + forwardingUri.toString());
       HttpResponse<String> response = client.send(request, HttpResponse.BodyHandlers.ofString());
+      log.debug("received " + response.statusCode() + "response from http server at " + forwardingUri.toString());
+      log.trace("response: " + LogUtil.convertForDisplay(response.body()));
       if (response.statusCode() == 200) {
-        return HandleStatus.SUCCESS;
+        return new ASTMHandlerResponse(response.body(), HandleStatus.SUCCESS, false, this);
       }
+      return new ASTMHandlerResponse(response.body(), HandleStatus.FAIL, false, this);
     } catch (IOException | InterruptedException e) {
       log.error("error occurred communicating with http server at " + forwardingUri.toString(), e);
     }
-    return HandleStatus.FAIL;
+    return new ASTMHandlerResponse("", HandleStatus.FAIL, false, this);
   }
 
   @Override
   public boolean matches(ASTMMessage message) {
     return message instanceof DefaultASTMMessage;
+  }
+
+  @Override
+  public String getName() {
+    return "Forwarding ASTM to HTTP Handler";
   }
 }

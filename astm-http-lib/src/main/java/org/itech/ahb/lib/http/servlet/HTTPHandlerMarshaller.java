@@ -31,6 +31,7 @@ public class HTTPHandlerMarshaller {
     return handle(message, Set.of());
   }
 
+  //TODO rework this like ASTMHandler to allow multiple handlers and more informative responses
   public HandleStatus handle(ASTMMessage message, Set<HttpForwardingHandlerInfo> handlersInfos) {
     Map<ASTMMessage, HTTPHandler> messageHandlers = new HashMap<>();
     log.debug("finding a handler for astm http message: " + message.hashCode());
