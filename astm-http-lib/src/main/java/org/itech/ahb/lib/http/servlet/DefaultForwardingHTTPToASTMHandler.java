@@ -40,7 +40,8 @@ public class DefaultForwardingHTTPToASTMHandler implements HTTPHandler {
   }
 
   @Override
-  public HandleStatus handle(ASTMMessage message, Set<HTTPHandlerInfo> handlerInfos) throws FrameParsingException {
+  public HTTPHandlerResponse handle(ASTMMessage message, Set<HTTPHandlerInfo> handlerInfos)
+    throws FrameParsingException {
     Socket socket = null;
     boolean success = false;
     boolean closeSocket = true;
@@ -49,8 +50,8 @@ public class DefaultForwardingHTTPToASTMHandler implements HTTPHandler {
     int forwardingPort = this.defaultForwardingPort;
     ASTMVersion forwardingProtocol = this.defaultForwardingProtocol;
     for (HTTPHandlerInfo handlerInfo : handlerInfos) {
-      if (handlerInfo instanceof HttpForwardingHandlerInfo) {
-        HttpForwardingHandlerInfo httpForwardingHandlerInfo = (HttpForwardingHandlerInfo) handlerInfo;
+      if (handlerInfo instanceof HTTPForwardingHandlerInfo) {
+        HTTPForwardingHandlerInfo httpForwardingHandlerInfo = (HTTPForwardingHandlerInfo) handlerInfo;
         forwardingAddress = StringUtils.isBlank(httpForwardingHandlerInfo.getForwardAddress())
           ? forwardingAddress
           : httpForwardingHandlerInfo.getForwardAddress();
@@ -99,7 +100,7 @@ public class DefaultForwardingHTTPToASTMHandler implements HTTPHandler {
       }
     } catch (IOException | ASTMCommunicationException e) {
       log.error("error occurred communicating with astm server at " + forwardingAddress + ":" + forwardingPort, e);
-      return HandleStatus.FAIL;
+      return new HTTPHandlerResponse("", HandleStatus.FAIL, false, this);
     } finally {
       if (closeSocket) {
         if (socket != null && !socket.isClosed()) {
@@ -115,11 +116,16 @@ public class DefaultForwardingHTTPToASTMHandler implements HTTPHandler {
         }
       }
     }
-    return success ? HandleStatus.SUCCESS : HandleStatus.FAIL;
+    return new HTTPHandlerResponse("", success ? HandleStatus.SUCCESS : HandleStatus.FAIL, false, this);
   }
 
   @Override
   public boolean matches(ASTMMessage message) {
     return message instanceof DefaultASTMMessage;
+  }
+
+  @Override
+  public String getName() {
+    return "Default HTTP to ASTM Handler";
   }
 }

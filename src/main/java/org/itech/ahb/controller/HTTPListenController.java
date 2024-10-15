@@ -12,11 +12,13 @@ import org.itech.ahb.lib.common.ASTMInterpreterFactory;
 import org.itech.ahb.lib.common.ASTMMessage;
 import org.itech.ahb.lib.common.DefaultASTMMessage;
 import org.itech.ahb.lib.common.HandleStatus;
+import org.itech.ahb.lib.http.HTTPHandlerResponse;
 import org.itech.ahb.lib.http.servlet.DefaultForwardingHTTPToASTMHandler;
+import org.itech.ahb.lib.http.servlet.HTTPForwardingHandlerInfo;
 import org.itech.ahb.lib.http.servlet.HTTPHandler;
 import org.itech.ahb.lib.http.servlet.HTTPHandlerMarshaller;
 import org.itech.ahb.lib.http.servlet.HTTPHandlerMarshaller.MarshallerMode;
-import org.itech.ahb.lib.http.servlet.HttpForwardingHandlerInfo;
+import org.itech.ahb.lib.http.servlet.HTTPHandlerResponse;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -49,7 +51,7 @@ public class HTTPListenController {
   }
 
   @PostMapping
-  public void recieveASTMMessageOverHttp(
+  public HTTPMarshallerResponse recieveASTMMessageOverHttp(
     @RequestBody(required = false) String requestBody,
     @RequestParam(required = false) String forwardAddress,
     @RequestParam(required = false, defaultValue = "0") Integer forwardPort,
@@ -60,16 +62,22 @@ public class HTTPListenController {
     ASTMMessage message = interpreterFactory
       .createInterpreterForText(requestBody)
       .interpretASTMTextToMessage(requestBody);
-    HttpForwardingHandlerInfo handlerInfo = new HttpForwardingHandlerInfo();
+    HTTPForwardingHandlerInfo handlerInfo = new HTTPForwardingHandlerInfo();
     handlerInfo.setForwardAddress(forwardAddress);
     handlerInfo.setForwardPort(forwardPort);
     handlerInfo.setForwardAstmVersion(forwardAstmVersion);
-    HandleStatus status = httpHandlerMarshaller.handle(message, Set.of(handlerInfo));
-    log.debug("http HandleStatus is: " + status);
-    if (status.equals(HandleStatus.SUCCESS)) {
-      response.setStatus(HttpServletResponse.SC_OK);
+    HTTPMarshallerResponse response = httpHandlerMarshaller.handle(message, Set.of(handlerInfo));
+    if (response.getResponses() == null || response.getResponses().size() == 0) {
+      log.error("message was unhandled");
     } else {
-      response.setStatus(HttpServletResponse.SC_INTERNAL_SERVER_ERROR);
+      for (HTTPHandlerResponse handlerResponse : response.getResponses()) {
+        if (handlerResponse.getStatus() != HandleStatus.SUCCESS) {
+          log.error("message was not handled successfully by: " + handlerResponse.getHandler().getName());
+        } else {
+          log.debug("message was handled successfully by: " + handlerResponse.getHandler().getName());
+        }
+      }
     }
+    return response;
   }
 }

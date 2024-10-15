@@ -4,7 +4,7 @@ import lombok.Data;
 import org.itech.ahb.lib.astm.servlet.ASTMServlet.ASTMVersion;
 
 @Data
-public class HttpForwardingHandlerInfo implements HTTPHandlerInfo {
+public class HTTPForwardingHandlerInfo implements HTTPHandlerInfo {
 
   private String forwardAddress;
   private int forwardPort;

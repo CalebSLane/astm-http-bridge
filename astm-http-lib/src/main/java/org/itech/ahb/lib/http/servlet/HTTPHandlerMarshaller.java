@@ -1,5 +1,6 @@
 package org.itech.ahb.lib.http.servlet;
 
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -27,47 +28,58 @@ public class HTTPHandlerMarshaller {
     this.mode = mode;
   }
 
-  public HandleStatus handle(ASTMMessage message) {
+  public HTTPMarshallerResponse handle(ASTMMessage message) {
     return handle(message, Set.of());
   }
 
-  //TODO rework this like ASTMHandler to allow multiple handlers and more informative responses
-  public HandleStatus handle(ASTMMessage message, Set<HttpForwardingHandlerInfo> handlersInfos) {
-    Map<ASTMMessage, HTTPHandler> messageHandlers = new HashMap<>();
+  public HTTPMarshallerResponse handle(ASTMMessage message, Set<HTTPForwardingHandlerInfo> handlersInfos) {
+    Map<ASTMMessage, List<HTTPHandler>> messageHandlersMap = new HashMap<>();
     log.debug("finding a handler for astm http message: " + message.hashCode());
     for (HTTPHandler handler : handlers) {
       if (handler.matches(message)) {
         log.debug("handler found for astm http message: " + message.hashCode());
-        messageHandlers.put(message, handler);
+        List<HTTPHandler> matchingMessageHandlers = messageHandlersMap.getOrDefault(message, new ArrayList<>());
+        matchingMessageHandlers.add(handler);
+
+        messageHandlersMap.put(message, matchingMessageHandlers);
         if (mode == MarshallerMode.FIRST) {
+          log.debug("marshall mode is FIRST, proceeding with a single handler");
           break;
         }
       }
     }
-    if (!messageHandlers.containsKey(message)) {
+    if (!messageHandlersMap.containsKey(message)) {
       log.warn("astm http message received but no handler was configured to handle the message");
+      return new HTTPMarshallerResponse();
     }
 
+    List<HTTPHandlerResponse> handleResponses = new ArrayList<>();
     log.debug("handling astm http message...");
-    for (Entry<ASTMMessage, HTTPHandler> messageHandler : messageHandlers.entrySet()) {
-      try {
-        HandleStatus status = messageHandler
-          .getValue()
-          .handle(
-            messageHandler.getKey(),
-            handlersInfos.stream().filter(e -> e.supports(messageHandler.getValue())).collect(Collectors.toSet())
+    for (Entry<ASTMMessage, List<HTTPHandler>> matchingMessageHandlers : messageHandlersMap.entrySet()) {
+      for (HTTPHandler messageHandler : matchingMessageHandlers.getValue()) {
+        try {
+          HTTPHandlerResponse handleResponse = messageHandler.handle(
+            matchingMessageHandlers.getKey(),
+            handlersInfos.stream().filter(e -> e.supports(messageHandler)).collect(Collectors.toSet())
           );
-        log.debug("finished attempting handling astm http message");
-        return status;
-      } catch (RuntimeException e) {
-        log.error("unexpected error occurred during handling astm http message: " + messageHandler.getKey(), e);
-        return HandleStatus.FAIL;
-        // TODO add some handle exception handling. retry queue? db save?
-      } catch (FrameParsingException e) {
-        log.error("Line contention has occured and could not parse the received information", e);
-        return HandleStatus.FAIL;
+          log.debug("'" + messageHandler.getName() + "' finished handling astm http message");
+          handleResponses.add(handleResponse);
+        } catch (FrameParsingException e) {
+          log.error("couldn't parse frames into a message", e);
+          handleResponses.add(new HTTPHandlerResponse("", HandleStatus.FAIL, false, messageHandler));
+        } catch (RuntimeException e) {
+          log.error(
+            "unexpected error occurred during '" +
+            messageHandler.getName() +
+            "' handling astm http message: " +
+            matchingMessageHandlers.getKey(),
+            e
+          );
+          handleResponses.add(new HTTPHandlerResponse("", HandleStatus.FAIL, false, messageHandler));
+          // TODO add some handle exception handling. retry queue? db save?
+        }
       }
     }
-    return HandleStatus.UNHANDLED;
+    return new HTTPMarshallerResponse(handleResponses);
   }
 }
