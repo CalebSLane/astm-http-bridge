@@ -12,13 +12,13 @@ import org.itech.ahb.lib.common.ASTMInterpreterFactory;
 import org.itech.ahb.lib.common.ASTMMessage;
 import org.itech.ahb.lib.common.DefaultASTMMessage;
 import org.itech.ahb.lib.common.HandleStatus;
-import org.itech.ahb.lib.http.HTTPHandlerResponse;
 import org.itech.ahb.lib.http.servlet.DefaultForwardingHTTPToASTMHandler;
 import org.itech.ahb.lib.http.servlet.HTTPForwardingHandlerInfo;
 import org.itech.ahb.lib.http.servlet.HTTPHandler;
 import org.itech.ahb.lib.http.servlet.HTTPHandlerMarshaller;
 import org.itech.ahb.lib.http.servlet.HTTPHandlerMarshaller.MarshallerMode;
 import org.itech.ahb.lib.http.servlet.HTTPHandlerResponse;
+import org.itech.ahb.lib.http.servlet.HTTPMarshallerResponse;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -66,11 +66,11 @@ public class HTTPListenController {
     handlerInfo.setForwardAddress(forwardAddress);
     handlerInfo.setForwardPort(forwardPort);
     handlerInfo.setForwardAstmVersion(forwardAstmVersion);
-    HTTPMarshallerResponse response = httpHandlerMarshaller.handle(message, Set.of(handlerInfo));
-    if (response.getResponses() == null || response.getResponses().size() == 0) {
+    HTTPMarshallerResponse marshallerResponse = httpHandlerMarshaller.handle(message, Set.of(handlerInfo));
+    if (marshallerResponse.getResponses() == null || marshallerResponse.getResponses().size() == 0) {
       log.error("message was unhandled");
     } else {
-      for (HTTPHandlerResponse handlerResponse : response.getResponses()) {
+      for (HTTPHandlerResponse handlerResponse : marshallerResponse.getResponses()) {
         if (handlerResponse.getStatus() != HandleStatus.SUCCESS) {
           log.error("message was not handled successfully by: " + handlerResponse.getHandler().getName());
         } else {
@@ -78,6 +78,6 @@ public class HTTPListenController {
         }
       }
     }
-    return response;
+    return marshallerResponse;
   }
 }

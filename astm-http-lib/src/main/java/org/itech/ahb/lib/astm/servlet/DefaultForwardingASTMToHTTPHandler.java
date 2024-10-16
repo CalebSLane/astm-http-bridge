@@ -52,7 +52,7 @@ public class DefaultForwardingASTMToHTTPHandler implements ASTMHandler {
     try {
       log.debug("forwarding request to http server at " + forwardingUri.toString());
       HttpResponse<String> response = client.send(request, HttpResponse.BodyHandlers.ofString());
-      log.debug("received " + response.statusCode() + "response from http server at " + forwardingUri.toString());
+      log.debug("received " + response.statusCode() + " response from http server at " + forwardingUri.toString());
       log.trace("response: " + LogUtil.convertForDisplay(response.body()));
       if (response.statusCode() == 200) {
         return new ASTMHandlerResponse(response.body(), HandleStatus.SUCCESS, false, this);
