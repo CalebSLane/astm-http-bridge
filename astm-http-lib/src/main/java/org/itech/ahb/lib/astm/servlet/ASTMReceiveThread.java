@@ -2,8 +2,8 @@ package org.itech.ahb.lib.astm.servlet;
 
 import java.io.IOException;
 import java.net.Socket;
+import java.net.SocketTimeoutException;
 import lombok.extern.slf4j.Slf4j;
-import org.itech.ahb.lib.astm.ASTMHandlerResponse;
 import org.itech.ahb.lib.common.ASTMMessage;
 import org.itech.ahb.lib.common.HandleStatus;
 import org.itech.ahb.lib.common.exception.ASTMCommunicationException;
@@ -51,6 +51,12 @@ public class ASTMReceiveThread extends Thread {
       } catch (IllegalStateException | FrameParsingException | ASTMCommunicationException e) {
         log.error("an error occurred understanding what was received from the astm sender", e);
         return;
+      } catch (InterruptedException e) {
+        log.error("the thread was interrupted during receive protocol", e);
+        return;
+      } catch (SocketTimeoutException e) {
+        log.error("there was a timeout in the receive protocol at the socket level, abandoning message", e);
+        return;
       }
       ASTMMarshallerResponse response = astmHandlerMarshaller.handle(message);
       if (response.getResponses() == null || response.getResponses().size() == 0) {
@@ -76,5 +82,9 @@ public class ASTMReceiveThread extends Thread {
         }
       }
     }
+  }
+
+  public boolean didReceiveEstablishmentSucceed() {
+    return communicator.didReceiveEstablishmentSucceed();
   }
 }

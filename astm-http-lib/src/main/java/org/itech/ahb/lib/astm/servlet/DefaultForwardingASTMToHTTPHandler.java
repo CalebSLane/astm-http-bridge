@@ -8,7 +8,6 @@ import java.net.http.HttpRequest.Builder;
 import java.net.http.HttpResponse;
 import java.util.Base64;
 import lombok.extern.slf4j.Slf4j;
-import org.itech.ahb.lib.astm.ASTMHandlerResponse;
 import org.itech.ahb.lib.common.ASTMMessage;
 import org.itech.ahb.lib.common.DefaultASTMMessage;
 import org.itech.ahb.lib.common.HandleStatus;

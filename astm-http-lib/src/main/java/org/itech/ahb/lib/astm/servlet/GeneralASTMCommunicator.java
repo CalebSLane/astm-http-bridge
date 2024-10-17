@@ -2,10 +2,10 @@ package org.itech.ahb.lib.astm.servlet;
 
 import java.io.BufferedReader;
 import java.io.IOException;
-import java.io.InputStream;
 import java.io.InputStreamReader;
-import java.io.OutputStream;
 import java.io.PrintWriter;
+import java.net.Socket;
+import java.net.SocketTimeoutException;
 import java.nio.charset.Charset;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
@@ -30,6 +30,7 @@ import org.itech.ahb.lib.common.ASTMMessage;
 import org.itech.ahb.lib.common.ASTMRecord;
 import org.itech.ahb.lib.common.exception.ASTMCommunicationException;
 import org.itech.ahb.lib.common.exception.FrameParsingException;
+import org.itech.ahb.lib.common.thread.ThreadUtil;
 import org.itech.ahb.lib.util.LogUtil;
 
 //If this class gets too complicated, separate out the LISA-01 and E1382-95 protocols
@@ -86,14 +87,11 @@ public class GeneralASTMCommunicator implements Communicator {
   public static final int OVERHEAD_CHARACTER_COUNT = 7;
   public static final int MAX_FRAME_SIZE = 64000;
   public static final int MAX_TEXT_SIZE = MAX_FRAME_SIZE - OVERHEAD_CHARACTER_COUNT;
+  private static final int ESTABLISHMENT_SOCKET_TIMEOUT = 60; // in seconds
   private static final int ESTABLISHMENT_SEND_TIMEOUT = 15; // in seconds
-  private static final int ESTABLISHMENT_RECEIVE_TIMEOUT = 20; // in seconds
   private static final int RECIEVE_FRAME_TIMEOUT = 30; // in seconds
   private static final int SEND_FRAME_TIMEOUT = 15; // in seconds
-  private static final int MAX_RECEIVE_RETRY_ATTEMPTS = 3;
-  private static final int MAX_SEND_ESTABLISH_RETRY_ATTEMPTS = 3;
-  private static final int SEND_ATTEMPTS_WAIT = 10; // in seconds
-  private static final int MAX_FRAME_RETRY_ATTEMPTS = 5;
+  private static final int MAX_FRAME_RETRY_ATTEMPTS = 5; // 6 - 1 as retries are after first attmpt
 
   public static final int MAX_FRAME_SIZE_E138195 = 247;
   public static final int MAX_TEXT_SIZE_E138195 = MAX_FRAME_SIZE_E138195 - OVERHEAD_CHARACTER_COUNT;
@@ -112,24 +110,22 @@ public class GeneralASTMCommunicator implements Communicator {
   private final ASTMInterpreterFactory astmInterpreterFactory;
   private final String communicatorId; // only used for debug messages
 
+  private final Socket socket;
   private final BufferedReader reader;
   private final PrintWriter writer;
   private ASTMVersion astmVersion;
+  private Boolean receiveEstablished = false;
 
-  public GeneralASTMCommunicator(ASTMInterpreterFactory astmInterpreterFactory, InputStream input, OutputStream output)
-    throws IOException {
-    this(astmInterpreterFactory, input, output, ASTMVersion.LIS01_A);
+  public GeneralASTMCommunicator(ASTMInterpreterFactory astmInterpreterFactory, Socket socket) throws IOException {
+    this(astmInterpreterFactory, socket, ASTMVersion.LIS01_A);
   }
 
-  public GeneralASTMCommunicator(
-    ASTMInterpreterFactory astmInterpreterFactory,
-    InputStream input,
-    OutputStream output,
-    ASTMVersion astmVersion
-  ) throws IOException {
+  public GeneralASTMCommunicator(ASTMInterpreterFactory astmInterpreterFactory, Socket socket, ASTMVersion astmVersion)
+    throws IOException {
     communicatorId = Integer.toString(incrementAndGetId());
-    BufferedReader reader = new BufferedReader(new InputStreamReader(input, StandardCharsets.UTF_8));
-    PrintWriter writer = new PrintWriter(output, true);
+    this.socket = socket;
+    BufferedReader reader = new BufferedReader(new InputStreamReader(socket.getInputStream(), StandardCharsets.UTF_8));
+    PrintWriter writer = new PrintWriter(socket.getOutputStream(), true);
 
     this.astmInterpreterFactory = astmInterpreterFactory;
     this.reader = reader;
@@ -143,139 +139,123 @@ public class GeneralASTMCommunicator implements Communicator {
   }
 
   @Override
+  public boolean didReceiveEstablishmentSucceed() {
+    return receiveEstablished;
+  }
+
+  @Override
   public ASTMMessage receiveProtocol(boolean lineWasContentious)
-    throws FrameParsingException, ASTMCommunicationException, IOException {
+    throws FrameParsingException, ASTMCommunicationException, IOException, InterruptedException {
     log.trace("starting receive protocol for ASTM message");
     if (astmVersion == ASTMVersion.LIS01_A) {
-      final FutureTask<Boolean> establishedFuture = new FutureTask<>(establishmentTaskReceive());
-      Boolean established = false;
       try {
-        established = establishedFuture.get(
-          lineWasContentious ? ESTABLISHMENT_RECEIVE_TIMEOUT : ESTABLISHMENT_SEND_TIMEOUT,
-          TimeUnit.SECONDS
-        );
-      } catch (TimeoutException e) {
+        receiveEstablished = establishmentReceive();
+      } catch (SocketTimeoutException e) {
         log.warn(
           "waited " +
-          ESTABLISHMENT_SEND_TIMEOUT +
+          ESTABLISHMENT_SOCKET_TIMEOUT +
           " " +
           TimeUnit.SECONDS +
           " for the sender to send anything but nothing was received"
         );
-        // attempt sending information?
-        establishedFuture.cancel(true);
-        throw new ASTMCommunicationException(
-          "a timeout occured during the establishment phase of the receive protocol",
-          e
-        );
-      } catch (InterruptedException | ExecutionException e) {
-        throw new ASTMCommunicationException(
-          "the establishment phase of the receive protocol was interrupted or had an error in execution",
-          e
-        );
+        //TODO should we assume that the sender wants to receive data if it doesn't even send a single character?
+        throw e;
       }
-      if (!established) {
+      if (!receiveEstablished) {
         throw new ASTMCommunicationException(
           "something went wrong in the establishment phase of the receive protocol, possibly the wrong start character was received"
         );
       }
-
-      log.trace("astm LIS01-A receive protocol: established");
-      return receiveInCompliantMode();
+      switch (astmVersion) {
+        case E1381_95:
+        //TODO create a real 95 listener?
+        case LIS01_A:
+          return receiveInCompliantMode();
+        case NON_COMPLIANT:
+        default:
+          return receiveInNonCompliantMode();
+      }
     }
     log.trace("astm transmission protocol not being used");
     return receiveInNonCompliantMode();
   }
 
-  private Callable<Boolean> establishmentTaskReceive() {
-    return new Callable<Boolean>() {
-      @Override
-      public Boolean call() throws IOException {
-        char establishmentChar = (char) reader.read();
-        log.trace(
-          "received: '" +
-          LogUtil.convertForDisplay(establishmentChar) +
-          "'. Expecting establishment signal [" +
-          LogUtil.convertForDisplay(ENQ) +
-          "] aka [0x05]"
-        );
+  public Boolean establishmentReceive() throws IOException, InterruptedException {
+    socket.setSoTimeout(ESTABLISHMENT_SOCKET_TIMEOUT * 1000);
+    char establishmentChar = (ThreadUtil.readCharWithInterruptCheck(reader));
+    log.trace(
+      "received: '" +
+      LogUtil.convertForDisplay(establishmentChar) +
+      "'. Expecting establishment signal [" +
+      LogUtil.convertForDisplay(ENQ) +
+      "] aka [0x05]"
+    );
 
-        if (establishmentChar == ENQ) {
-          log.trace("sending: '" + LogUtil.convertForDisplay(ACK) + "' to indicate ready to receive frames");
-          writer.append(ACK);
-          writer.flush();
-          return true;
-        } else if (establishmentChar == NON_COMPLIANT_START_CHARACTER) {
-          log.debug(
-            "protocol assumed to be non-compliant as '" +
-            LogUtil.convertForDisplay(establishmentChar) +
-            "' was sent. Attempting to read message in non-compliant mode'"
-          );
-          astmVersion = ASTMVersion.NON_COMPLIANT;
-          return true;
-        } else {
-          log.trace(
-            "sending: '" +
-            LogUtil.convertForDisplay(NAK) +
-            "' to indicate not ready to receive frames. Incorrect establishment signal"
-          );
-          writer.append(NAK);
-          writer.flush();
-          return false;
-        }
-      }
-    };
+    if (establishmentChar == ENQ) {
+      log.trace("sending: '" + LogUtil.convertForDisplay(ACK) + "' to indicate ready to receive frames");
+      writer.append(ACK);
+      writer.flush();
+      log.trace("astm LIS01-A receive protocol: established");
+      return true;
+    } else if (establishmentChar == NON_COMPLIANT_START_CHARACTER) {
+      //technically the ASTM specs say to "ignore other characters" but we are assuming this is just a non-compliant transmission
+      log.debug(
+        "protocol assumed to be non-compliant as '" +
+        LogUtil.convertForDisplay(establishmentChar) +
+        "' was sent. Attempting to read message in non-compliant mode'"
+      );
+      astmVersion = ASTMVersion.NON_COMPLIANT;
+      return true;
+    } else {
+      //technically the ASTM specs say to "ignore other characters" but we are just stopping communication if somehting else is received
+      log.trace(
+        "sending: '" +
+        LogUtil.convertForDisplay(NAK) +
+        "' to indicate not ready to receive frames. Incorrect establishment signal"
+      );
+      writer.append(NAK);
+      writer.flush();
+      return false;
+    }
   }
 
   private ASTMMessage receiveInNonCompliantMode()
     throws IOException, ASTMCommunicationException, FrameParsingException {
-    final FutureTask<ASTMMessage> recievedMessageFuture = new FutureTask<>(receiveMessage());
+    final FutureTask<ASTMMessage> recievedMessageFuture = new FutureTask<>(receiveIncompliantMessage());
     try {
+      recievedMessageFuture.run();
       return recievedMessageFuture.get(NON_COMPLIANT_RECEIVE_TIMEOUT, TimeUnit.SECONDS);
     } catch (TimeoutException e) {
       recievedMessageFuture.cancel(true);
-      log.error("a timeout occured during the reveiving message in non-compliant mode", e);
+      log.error("a timeout occured while receiving message in non-compliant mode", e);
     } catch (InterruptedException | ExecutionException e) {
       log.error("the thread was interrupted or had an error in exeuction", e);
     }
     throw new ASTMCommunicationException("non compliant mode could not return a valid ASTM message");
   }
 
-  private Callable<ASTMMessage> receiveMessage() {
+  private Callable<ASTMMessage> receiveIncompliantMessage() {
     return new Callable<ASTMMessage>() {
       @Override
       public ASTMMessage call() throws IOException, ASTMCommunicationException {
         List<ASTMRecord> records = new ArrayList<>();
         boolean messageTerminationRecordReceived = false;
         int i = 0;
-        List<Exception> exceptions = new ArrayList<>();
-        while (!messageTerminationRecordReceived && exceptions.size() <= MAX_RECEIVE_RETRY_ATTEMPTS) {
-          if (exceptions.size() > 0) {
-            log.debug("attempting retry of record " + i);
-          }
+        while (!messageTerminationRecordReceived) {
           try {
             Set<FrameError> frameErrors = readNextIncompliantRecord(records);
             if (frameErrors.isEmpty()) {
               log.debug("record successfully received");
-              exceptions = new ArrayList<>(); // reset as retry mechanism is per record
               if (records.get(i).getRecord().trim().endsWith(TERMINATION_RECORD_END)) {
                 messageTerminationRecordReceived = true;
               }
               ++i;
             } else {
               log.debug("frame unsuccessfully received due to: " + frameErrors);
-              exceptions.add(new ASTMCommunicationException("frame unsuccessfully received due to: " + frameErrors));
             }
           } catch (Exception e) {
             log.error("the receiving phase had an error in exeuction", e);
-            exceptions.add(e);
           }
-        }
-
-        if (exceptions.size() > MAX_RECEIVE_RETRY_ATTEMPTS) {
-          throw new ASTMCommunicationException(
-            "the receiving phase failed or had exceptions exceeding the number of retries"
-          );
         }
 
         return astmInterpreterFactory.createInterpreterForRecords(records).interpretASTMRecordsToMessage(records);
@@ -287,12 +267,13 @@ public class GeneralASTMCommunicator implements Communicator {
     List<ASTMFrame> frames = new ArrayList<>();
     int i = 0;
     List<Exception> exceptions = new ArrayList<>();
-    while (exceptions.size() <= MAX_RECEIVE_RETRY_ATTEMPTS) {
+    while (exceptions.size() <= MAX_FRAME_RETRY_ATTEMPTS) {
       if (exceptions.size() > 0) {
         log.debug("attempting retry of frame " + i);
       }
       final FutureTask<ReadFrameInfo> recievedFrameFuture = new FutureTask<>(receiveNextFrameTask(frames));
       try {
+        recievedFrameFuture.run();
         ReadFrameInfo frameInfo = recievedFrameFuture.get(RECIEVE_FRAME_TIMEOUT, TimeUnit.SECONDS);
         if (frameInfo.getStartChar() != EOT) {
           break;
@@ -301,7 +282,7 @@ public class GeneralASTMCommunicator implements Communicator {
         if (frameErrors.isEmpty()) {
           log.debug("frame successfully received");
           log.trace("sending: '" + LogUtil.convertForDisplay(ACK) + "' to indicate received frame correctly");
-          writer.append(ACK);
+          writer.append(ACK); //it is also permitted to send an EOT to try to end the transmission after reading a frame
           writer.flush();
           exceptions = new ArrayList<>(); // reset as retry mechanism is per frame
           ++i;
@@ -314,15 +295,28 @@ public class GeneralASTMCommunicator implements Communicator {
         }
       } catch (TimeoutException e) {
         recievedFrameFuture.cancel(true);
-        exceptions.add(e);
-        log.error("a timeout occured during the receiving phase", e);
+        throw new ASTMCommunicationException("a timeout occured while receiving message in non-compliant mode", e);
       } catch (InterruptedException | ExecutionException e) {
-        log.error("the receiving phase was interrupted or had an error in exeuction", e);
-        exceptions.add(e);
+        throw new ASTMCommunicationException("the thread was interrupted or had an error in exeuction", e);
       }
     }
 
-    if (exceptions.size() > MAX_RECEIVE_RETRY_ATTEMPTS) {
+    if (exceptions.size() > MAX_FRAME_RETRY_ATTEMPTS) {
+      log.error("MAX_FRAME_RETRY_ATTEMPTS reached for frame");
+      for (Exception e : exceptions) {
+        log.error(e.getMessage());
+      }
+      //sender is supposed to enter the termination phase when max attempts are reached, which means EOT is expected, but is irrelevant)
+      try {
+        @SuppressWarnings("unused")
+        char eotChar = (char) reader.read();
+      } catch (SocketTimeoutException e) {
+        log.error("socket timed out waiting for end of transmission after max retries reached");
+        throw new ASTMCommunicationException(
+          "the receiving phase failed or had exceptions exceeding the number of retries",
+          e
+        );
+      }
       throw new ASTMCommunicationException(
         "the receiving phase failed or had exceptions exceeding the number of retries"
       );
@@ -334,8 +328,9 @@ public class GeneralASTMCommunicator implements Communicator {
   private Callable<ReadFrameInfo> receiveNextFrameTask(List<ASTMFrame> frames) throws IOException {
     return new Callable<ReadFrameInfo>() {
       @Override
-      public ReadFrameInfo call() throws IOException {
-        char startChar = (char) reader.read();
+      public ReadFrameInfo call() throws IOException, InterruptedException {
+        socket.setSoTimeout(RECIEVE_FRAME_TIMEOUT * 1000);
+        char startChar = ThreadUtil.readCharWithInterruptCheck(reader);
         log.trace(
           "received: '" +
           LogUtil.convertForDisplay(startChar) +
@@ -356,16 +351,19 @@ public class GeneralASTMCommunicator implements Communicator {
     };
   }
 
-  private Set<FrameError> readNextCompliantFrame(List<ASTMFrame> frames, int expectedFrameNumber) throws IOException {
+  private Set<FrameError> readNextCompliantFrame(List<ASTMFrame> frames, int expectedFrameNumber)
+    throws IOException, InterruptedException {
     log.debug("reading frame...");
     Set<FrameError> frameErrors = new HashSet<>();
-    char frameNumberChar = (char) reader.read();
+
+    char frameNumberChar = ThreadUtil.readCharWithInterruptCheck(reader);
     log.trace("received: '" + LogUtil.convertForDisplay(frameNumberChar) + "'. Expecting frame number [0-7]");
 
     if (expectedFrameNumber != Character.getNumericValue(frameNumberChar)) {
       frameErrors.add(FrameError.WRONG_FRAME_NUMBER);
+      //TODO add case where frame was retransmitted (expected frame number -1 mod 8. must also overwrite last frame)
     }
-    char curChar = (char) reader.read();
+    char curChar = ThreadUtil.readCharWithInterruptCheck(reader);
 
     int frameSize = 0;
     StringBuilder textBuilder = new StringBuilder();
@@ -378,7 +376,7 @@ public class GeneralASTMCommunicator implements Communicator {
       }
       textBuilder.append(curChar);
       ++frameSize;
-      curChar = (char) reader.read();
+      curChar = ThreadUtil.readCharWithInterruptCheck(reader);
     }
     boolean finalFrame = (curChar == ETX);
     String text = textBuilder.toString();
@@ -406,12 +404,12 @@ public class GeneralASTMCommunicator implements Communicator {
       frameErrors.add(FrameError.BAD_CHECKSUM);
     }
     String endFrameControlCode = "";
-    char endOfFrameChar = (char) reader.read();
+    char endOfFrameChar = ThreadUtil.readCharWithInterruptCheck(reader);
     endFrameControlCode = endFrameControlCode + endOfFrameChar;
     if (CR != endOfFrameChar) {
       frameErrors.add(FrameError.ILLEGAL_END);
     }
-    endOfFrameChar = (char) reader.read();
+    endOfFrameChar = ThreadUtil.readCharWithInterruptCheck(reader);
     endFrameControlCode = endFrameControlCode + endOfFrameChar;
     if (LF != endOfFrameChar) {
       frameErrors.add(FrameError.ILLEGAL_END);
@@ -432,16 +430,19 @@ public class GeneralASTMCommunicator implements Communicator {
       frames.add(frame);
       log.debug("frame added to list of frames");
     }
+    if (Thread.interrupted()) {
+      throw new InterruptedException();
+    }
     return frameErrors;
   }
 
-  private Set<FrameError> readNextIncompliantRecord(List<ASTMRecord> records) throws IOException {
+  private Set<FrameError> readNextIncompliantRecord(List<ASTMRecord> records) throws IOException, InterruptedException {
     log.debug("reading incompliant record...");
     Set<FrameError> recordErrors = new HashSet<>();
     StringBuilder textBuilder = new StringBuilder();
     char curChar = ' ';
     while (curChar != CR) {
-      curChar = (char) reader.read();
+      curChar = ThreadUtil.readCharWithInterruptCheck(reader);
       if (RESTRICTED_CHARACTERS.contains(curChar)) {
         recordErrors.add(FrameError.ILLEGAL_CHAR);
       }
@@ -464,58 +465,45 @@ public class GeneralASTMCommunicator implements Communicator {
   }
 
   @Override
-  public boolean sendProtocol(ASTMMessage message) throws ASTMCommunicationException, IOException {
+  public SendResult sendProtocol(ASTMMessage message)
+    throws ASTMCommunicationException, IOException, InterruptedException {
     log.trace("starting sendProtocol for ASTM message");
 
     List<ASTMFrame> frames = astmInterpreterFactory.createInterpreter(message).interpretASTMMessageToFrames(message);
 
     Boolean established = false;
-    Boolean lineContention = false;
-    for (int i = 0; i <= MAX_SEND_ESTABLISH_RETRY_ATTEMPTS; i++) {
-      final FutureTask<Character> establishedFuture = new FutureTask<>(establishmentTaskSend());
-      try {
-        Character validResponseChar = establishedFuture.get(ESTABLISHMENT_SEND_TIMEOUT, TimeUnit.SECONDS);
-        lineContention = Character.compare(validResponseChar, ENQ) == 0;
-        if (lineContention) {
-          return false;
-        }
-        established = Character.compare(validResponseChar, ACK) == 0;
-      } catch (TimeoutException e) {
-        establishedFuture.cancel(true);
-        log.error("a timeout occured during the establishment phase of the send protocol", e);
-      } catch (InterruptedException | ExecutionException e) {
-        log.error("the establishment phase of the send protocol was interrupted or had an error in execution", e);
+    Boolean nakReceived = false;
+    final FutureTask<Character> establishedFuture = new FutureTask<>(establishmentTaskSend());
+    try {
+      establishedFuture.run();
+      Character validResponseChar = establishedFuture.get(ESTABLISHMENT_SEND_TIMEOUT, TimeUnit.SECONDS);
+      Boolean lineContention = Character.compare(validResponseChar, ENQ) == 0;
+      if (lineContention) {
+        return new SendResult(true, false);
       }
-
-      if (established) {
-        log.trace("sendProtocol: established");
-        break;
-      } else {
-        try {
-          Thread.sleep(SEND_ATTEMPTS_WAIT * 1000);
-        } catch (InterruptedException e) {
-          log.error("the establishment phase of the send protocol was interrupted while waiting to rety", e);
-        }
-      }
+      established = Character.compare(validResponseChar, ACK) == 0;
+      nakReceived = Character.compare(validResponseChar, NAK) == 0;
+    } catch (TimeoutException e) {
+      establishedFuture.cancel(true);
+      log.error("a timeout occured during the establishment phase of the send protocol", e);
+    } catch (InterruptedException | ExecutionException e) {
+      log.error("the establishment phase of the send protocol was interrupted or had an error in execution", e);
     }
 
-    if (!established) {
+    if (established) {
+      log.trace("sendProtocol: established");
+    } else if (nakReceived) {
+      return new SendResult(false, true);
+    } else {
       terminationSignal();
-      throw new ASTMCommunicationException(
-        "the establishment phase failed or had exceptions exceeding the number of retries"
-      );
+      throw new ASTMCommunicationException("received a non-valid response or nothing in the establishment phase");
     }
 
     List<Exception> exceptions = new ArrayList<>();
     for (int i = 0; i < frames.size(); i++) {
-      final FutureTask<Boolean> sendFrameFuture = new FutureTask<>(sendNextFrameTask(frames.get(i)));
       try {
-        established = sendFrameFuture.get(SEND_FRAME_TIMEOUT, TimeUnit.SECONDS);
-      } catch (TimeoutException e) {
-        sendFrameFuture.cancel(true);
-        exceptions.add(e);
-        log.error("a timeout occured during the sending phase", e);
-      } catch (InterruptedException | ExecutionException e) {
+        sendNextFrameTask(frames.get(i)).call();
+      } catch (Exception e) {
         exceptions.add(e);
         log.error("the sending phase was interrupted or had an error in exeuction", e);
       }
@@ -525,7 +513,20 @@ public class GeneralASTMCommunicator implements Communicator {
         throw new ASTMCommunicationException("the send phase had too many retries sending frame " + i);
       }
 
-      char response = (char) reader.read();
+      socket.setSoTimeout(SEND_FRAME_TIMEOUT * 1000);
+      char response = ' ';
+      try {
+        response = ThreadUtil.readCharWithInterruptCheck(reader);
+      } catch (SocketTimeoutException e) {
+        terminationSignal();
+        throw new ASTMCommunicationException(
+          "timeout occured while waiting for an acknowledgement of the sent frame",
+          e
+        );
+      } catch (InterruptedException e) {
+        terminationSignal();
+        throw e;
+      }
       log.trace(
         "received: '" +
         LogUtil.convertForDisplay(response) +
@@ -536,7 +537,7 @@ public class GeneralASTMCommunicator implements Communicator {
         continue;
       } else if (response == EOT) {
         terminationSignal();
-        throw new ASTMCommunicationException("the send phase was terminated early by the remote server");
+        throw new ASTMCommunicationException("the send phase was terminated early by the receiver");
       } else if (response == NAK) {
         exceptions.add(new ASTMCommunicationException("NAK received for frame " + i));
         if (exceptions.size() > MAX_FRAME_RETRY_ATTEMPTS) {
@@ -554,17 +555,24 @@ public class GeneralASTMCommunicator implements Communicator {
       }
     }
     terminationSignal();
-    return true;
+    return new SendResult(false, false);
   }
 
   private Callable<Character> establishmentTaskSend() {
     return new Callable<Character>() {
       @Override
-      public Character call() throws IOException {
+      public Character call() throws IOException, InterruptedException {
+        socket.setSoTimeout(ESTABLISHMENT_SEND_TIMEOUT);
         log.trace("sending: '" + LogUtil.convertForDisplay(ENQ) + "' as establishment signal");
         writer.append(ENQ);
         writer.flush();
-        char response = (char) reader.read();
+        char response;
+        try {
+          response = ThreadUtil.readCharWithInterruptCheck(reader);
+        } catch (InterruptedException e) {
+          log.error("socket timed out while waiting for response to establishment signal");
+          throw e;
+        }
         log.trace(
           "received: '" +
           LogUtil.convertForDisplay(response) +

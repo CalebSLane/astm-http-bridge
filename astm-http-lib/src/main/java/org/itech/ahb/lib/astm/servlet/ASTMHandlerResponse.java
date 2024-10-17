@@ -1,10 +1,9 @@
-package org.itech.ahb.lib.astm;
+package org.itech.ahb.lib.astm.servlet;
 
 import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NonNull;
 import lombok.RequiredArgsConstructor;
-import org.itech.ahb.lib.astm.servlet.ASTMHandler;
 import org.itech.ahb.lib.common.HandleStatus;
 import org.itech.ahb.lib.common.HandlerResponse;
 

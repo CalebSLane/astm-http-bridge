@@ -39,7 +39,7 @@ public class ASTMServlet {
         // Waiting for socket connection
         Socket s = serverSocket.accept();
         new ASTMReceiveThread(
-          new GeneralASTMCommunicator(astmInterpreterFactory, s.getInputStream(), s.getOutputStream(), astmVersion),
+          new GeneralASTMCommunicator(astmInterpreterFactory, s, astmVersion),
           s,
           astmMessageMarshaller
         ).start();
