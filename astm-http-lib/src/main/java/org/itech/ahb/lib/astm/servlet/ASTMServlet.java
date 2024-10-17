@@ -3,7 +3,10 @@ package org.itech.ahb.lib.astm.servlet;
 import java.net.ServerSocket;
 import java.net.Socket;
 import lombok.extern.slf4j.Slf4j;
-import org.itech.ahb.lib.common.ASTMInterpreterFactory;
+import org.itech.ahb.lib.astm.communication.GeneralASTMCommunicator;
+import org.itech.ahb.lib.astm.handling.ASTMHandlerMarshaller;
+import org.itech.ahb.lib.astm.handling.ASTMReceiveThread;
+import org.itech.ahb.lib.astm.interpretation.ASTMInterpreterFactory;
 
 @Slf4j
 public class ASTMServlet {
