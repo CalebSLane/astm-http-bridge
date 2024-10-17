@@ -66,7 +66,7 @@ public class HTTPHandlerMarshaller {
           handleResponses.add(handleResponse);
         } catch (FrameParsingException e) {
           log.error("couldn't parse frames into a message", e);
-          handleResponses.add(new HTTPHandlerResponse("", HandleStatus.FAIL, false, messageHandler));
+          handleResponses.add(new HTTPHandlerResponse("", HandleStatus.FAIL_FRAME_PARSING, false, messageHandler));
         } catch (RuntimeException e) {
           log.error(
             "unexpected error occurred during '" +
@@ -75,11 +75,12 @@ public class HTTPHandlerMarshaller {
             matchingMessageHandlers.getKey(),
             e
           );
-          handleResponses.add(new HTTPHandlerResponse("", HandleStatus.FAIL, false, messageHandler));
-          // TODO add some handle exception handling. retry queue? db save?
+          handleResponses.add(new HTTPHandlerResponse("", HandleStatus.GENERIC_FAIL, false, messageHandler));
         }
       }
     }
+    // TODO add some handle exception handling. for every handleResponse not success call messageHandler.handleFailure();
+
     return new HTTPMarshallerResponse(handleResponses);
   }
 }

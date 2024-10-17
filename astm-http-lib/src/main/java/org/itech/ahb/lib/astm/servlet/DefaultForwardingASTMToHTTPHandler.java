@@ -56,11 +56,11 @@ public class DefaultForwardingASTMToHTTPHandler implements ASTMHandler {
       if (response.statusCode() == 200) {
         return new ASTMHandlerResponse(response.body(), HandleStatus.SUCCESS, false, this);
       }
-      return new ASTMHandlerResponse(response.body(), HandleStatus.FAIL, false, this);
+      return new ASTMHandlerResponse(response.body(), HandleStatus.FORWARD_FAIL_BAD_RESPONSE, false, this);
     } catch (IOException | InterruptedException e) {
       log.error("error occurred communicating with http server at " + forwardingUri.toString(), e);
+      return new ASTMHandlerResponse("", HandleStatus.GENERIC_FAIL, false, this);
     }
-    return new ASTMHandlerResponse("", HandleStatus.FAIL, false, this);
   }
 
   @Override

@@ -66,7 +66,7 @@ public class ASTMHandlerMarshaller {
             matchingMessageHandlers.getKey(),
             e
           );
-          handleResponses.add(new ASTMHandlerResponse("", HandleStatus.FAIL, false, messageHandler));
+          handleResponses.add(new ASTMHandlerResponse("", HandleStatus.GENERIC_FAIL, false, messageHandler));
           // TODO add some handle exception handling. retry queue? db save?
           // handler.handleError();
         }

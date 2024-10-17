@@ -79,7 +79,7 @@ public class DefaultForwardingHTTPToASTMHandler implements HTTPHandler {
         log.debug("reattempting forward to astm server...");
       } else if (retryAttempt > MAX_FORWARD_RETRY_ATTEMPTS) {
         log.error("reached max number of retries while attempting to forward http over astm");
-        return new HTTPHandlerResponse("", HandleStatus.FAIL, false, this);
+        return new HTTPHandlerResponse("", HandleStatus.FAIL_TOO_MANY_ATTEMPTS, false, this);
       }
       try {
         log.debug("connecting to forward to astm server at " + forwardingAddress + ":" + forwardingPort);
@@ -100,30 +100,7 @@ public class DefaultForwardingHTTPToASTMHandler implements HTTPHandler {
           log.warn(
             "line was contested by the remote server, defaulting to receive information from " + forwardingAddress
           );
-          // the communicator must remain open to receive the line contention. The thread
-          // will close the socket
-          ASTMReceiveThread receiveThread = new ASTMReceiveThread(communicator, socket, astmHandlerMarshaller, true);
-          receiveThread.run();
-          log.debug("waiting after line contention to see if sender has a message that needs to be received...");
-          TimeUnit.SECONDS.sleep(LINE_CONTENTION_REATTEMPT_TIMEOUT);
-          if (receiveThread.didReceiveEstablishmentSucceed()) {
-            log.debug("received an establishment after the line was in contention before the timeout");
-          } else {
-            log.error(
-              "a timeout occured waiting for the sender to reattempt establishment after the line was contested."
-            );
-            receiveThread.interrupt();
-            throw new ASTMCommunicationException(
-              "line contention occurred but receiver didn't receive an establishment character"
-            );
-          }
-
-          if (message.getMessageLength() == 0) {
-            log.info("since original message request was empty, it is assumed this was a ping to trigger an action");
-            return new HTTPHandlerResponse("", HandleStatus.SUCCESS, false, this);
-          } else {
-            return new HTTPHandlerResponse("", HandleStatus.FAIL, false, this);
-          }
+          return handleLineContention(communicator, socket, message);
         } else if (result.isRejected()) {
           return handle(message, handlerInfos, ++retryAttempt);
         } else {
@@ -147,7 +124,32 @@ public class DefaultForwardingHTTPToASTMHandler implements HTTPHandler {
       }
     } catch (InterruptedException e) {
       log.error("thread was interrupted while handling http astm message", e);
-      return new HTTPHandlerResponse("", HandleStatus.FAIL, false, this);
+      return new HTTPHandlerResponse("", HandleStatus.INTERRUPTED, false, this);
+    }
+  }
+
+  private HTTPHandlerResponse handleLineContention(Communicator communicator, Socket socket, ASTMMessage message)
+    throws ASTMCommunicationException, InterruptedException {
+    // the communicator must remain open to receive the line contention. The thread will close the socket
+    ASTMReceiveThread receiveThread = new ASTMReceiveThread(communicator, socket, astmHandlerMarshaller, true);
+    receiveThread.run();
+    log.debug("waiting after line contention to see if sender has a message that needs to be received...");
+    TimeUnit.SECONDS.sleep(LINE_CONTENTION_REATTEMPT_TIMEOUT);
+    if (receiveThread.didReceiveEstablishmentSucceed()) {
+      log.debug("received an establishment after the line was in contention before the timeout");
+    } else {
+      log.error("a timeout occured waiting for the sender to reattempt establishment after the line was contested.");
+      receiveThread.interrupt();
+      throw new ASTMCommunicationException(
+        "line contention occurred but receiver didn't receive an establishment character"
+      );
+    }
+
+    if (message.getMessageLength() == 0) {
+      log.info("since original message request was empty, it is assumed this was a ping to trigger an action");
+      return new HTTPHandlerResponse("", HandleStatus.SUCCESS, false, this);
+    } else {
+      return new HTTPHandlerResponse("", HandleStatus.FAIL_LINE_CONTESTED, false, this);
     }
   }
 
