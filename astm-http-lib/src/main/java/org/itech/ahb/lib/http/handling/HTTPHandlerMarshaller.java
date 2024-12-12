@@ -28,10 +28,19 @@ public class HTTPHandlerMarshaller {
     this.mode = mode;
   }
 
+  /**
+   * @param message
+   * @return HTTPMarshallerResponse
+   */
   public HTTPMarshallerResponse handle(ASTMMessage message) {
     return handle(message, Set.of());
   }
 
+  /**
+   * @param message
+   * @param handlersInfos
+   * @return HTTPMarshallerResponse
+   */
   public HTTPMarshallerResponse handle(ASTMMessage message, Set<HTTPForwardingHandlerInfo> handlersInfos) {
     Map<ASTMMessage, List<HTTPHandler>> messageHandlersMap = new HashMap<>();
     log.debug("finding a handler for astm http message: " + message.hashCode());

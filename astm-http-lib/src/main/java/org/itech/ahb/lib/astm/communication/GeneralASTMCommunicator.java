@@ -101,6 +101,9 @@ public class GeneralASTMCommunicator implements Communicator {
   private static final AtomicInteger COMMUNICATOR_ID_COUNTER = new AtomicInteger(0);
   private static final int MAX_COMMUNICATOR_ID_COUNTER = 1024;
 
+  /**
+   * @return int
+   */
   private final int incrementAndGetId() {
     return COMMUNICATOR_ID_COUNTER.accumulateAndGet(
       1,
@@ -134,6 +137,9 @@ public class GeneralASTMCommunicator implements Communicator {
     this.astmVersion = astmVersion;
   }
 
+  /**
+   * @return String
+   */
   @Override
   public String getID() {
     return communicatorId;

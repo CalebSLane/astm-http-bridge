@@ -7,11 +7,19 @@ import org.itech.ahb.lib.astm.concept.ASTMRecord;
 
 public class DefaultASTMInterpreterFactory implements ASTMInterpreterFactory {
 
+  /**
+   * @param frames
+   * @return ASTMInterpreter
+   */
   @Override
   public ASTMInterpreter createInterpreterForFrames(List<ASTMFrame> frames) {
     return new DefaultASTMInterpreter();
   }
 
+  /**
+   * @param records
+   * @return ASTMInterpreter
+   */
   @Override
   public ASTMInterpreter createInterpreterForRecords(List<ASTMRecord> records) {
     return new DefaultASTMInterpreter();

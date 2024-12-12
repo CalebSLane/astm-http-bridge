@@ -19,6 +19,11 @@ public class DefaultASTMInterpreter implements ASTMInterpreter {
   private static final String RECORD_SEPERATOR = Character.toString(0x0D); // CR
   private static final String MESSAGE_TERMINATOR_RECORD_START = "L";
 
+  /**
+   * @param frames
+   * @return ASTMMessage
+   * @throws FrameParsingException
+   */
   @Override
   public ASTMMessage interpretFramesToASTMMessage(List<ASTMFrame> frames) throws FrameParsingException {
     log.debug("interpreting frames as astm messages...");
@@ -45,6 +50,10 @@ public class DefaultASTMInterpreter implements ASTMInterpreter {
     return message;
   }
 
+  /**
+   * @param frame
+   * @return boolean
+   */
   private boolean frameContainsMessageTerminator(ASTMFrame frame) {
     String[] lines = frame.getText().split(RECORD_SEPERATOR);
     if (lines[lines.length - 1].startsWith(MESSAGE_TERMINATOR_RECORD_START)) {

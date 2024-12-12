@@ -11,6 +11,9 @@ public class DefaultASTMRecord implements ASTMRecord {
     this.record = record;
   }
 
+  /**
+   * @return int
+   */
   @Override
   public int getRecordLength() {
     if (record == null) {
@@ -20,6 +23,9 @@ public class DefaultASTMRecord implements ASTMRecord {
     }
   }
 
+  /**
+   * @return String
+   */
   public String getRecord() {
     if (record == null) {
       return "";

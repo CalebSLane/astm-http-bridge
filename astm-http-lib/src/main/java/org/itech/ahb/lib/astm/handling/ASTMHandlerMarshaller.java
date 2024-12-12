@@ -26,10 +26,19 @@ public class ASTMHandlerMarshaller {
     this.mode = mode;
   }
 
+  /**
+   * @param message
+   * @return ASTMMarshallerResponse
+   */
   public ASTMMarshallerResponse handle(ASTMMessage message) {
     return handle(message, Set.of());
   }
 
+  /**
+   * @param message
+   * @param handlersInfos
+   * @return ASTMMarshallerResponse
+   */
   public ASTMMarshallerResponse handle(ASTMMessage message, Set<ASTMForwardingHandlerInfo> handlersInfos) {
     Map<ASTMMessage, List<ASTMHandler>> messageHandlersMap = new HashMap<>();
     log.debug("finding a handler for astm message: " + message.hashCode());

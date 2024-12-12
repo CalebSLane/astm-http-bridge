@@ -5,6 +5,13 @@ import java.io.IOException;
 
 public class ThreadUtil {
 
+  
+  /** 
+   * @param reader
+   * @return char
+   * @throws IOException
+   * @throws InterruptedException
+   */
   public static char readCharWithInterruptCheck(BufferedReader reader) throws IOException, InterruptedException {
     char character = (char) reader.read();
     if (Thread.interrupted()) {

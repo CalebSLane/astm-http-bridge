@@ -32,6 +32,10 @@ public class DefaultForwardingASTMToHTTPHandler implements ASTMHandler {
     this.password = password;
   }
 
+  /**
+   * @param message
+   * @return ASTMHandlerResponse
+   */
   @Override
   public ASTMHandlerResponse handle(ASTMMessage message) {
     HttpClient client = HttpClient.newHttpClient();
@@ -63,11 +67,19 @@ public class DefaultForwardingASTMToHTTPHandler implements ASTMHandler {
     }
   }
 
+  /**
+   * @param message
+   * @return boolean
+   */
   @Override
   public boolean matches(ASTMMessage message) {
     return message instanceof DefaultASTMMessage;
   }
 
+  /**
+   * @param message
+   * @return boolean
+   */
   @Override
   public String getName() {
     return "Forwarding ASTM to HTTP Handler";

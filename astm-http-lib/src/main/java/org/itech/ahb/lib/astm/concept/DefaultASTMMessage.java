@@ -24,6 +24,9 @@ public class DefaultASTMMessage implements ASTMMessage {
     this.records = records;
   }
 
+  /**
+   * @return int
+   */
   @Override
   public int getMessageLength() {
     if (records == null) {
@@ -33,6 +36,9 @@ public class DefaultASTMMessage implements ASTMMessage {
     }
   }
 
+  /**
+   * @return String
+   */
   public String getMessage() {
     if (records == null) {
       return "";

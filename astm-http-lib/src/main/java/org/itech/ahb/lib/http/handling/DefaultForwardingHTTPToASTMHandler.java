@@ -45,12 +45,25 @@ public class DefaultForwardingHTTPToASTMHandler implements HTTPHandler {
     this.astmHandlerMarshaller = astmHandlerMarshaller;
   }
 
+  /**
+   * @param message
+   * @param handlerInfos
+   * @return HTTPHandlerResponse
+   * @throws FrameParsingException
+   */
   @Override
   public HTTPHandlerResponse handle(ASTMMessage message, Set<HTTPHandlerInfo> handlerInfos)
     throws FrameParsingException {
     return handle(message, handlerInfos, 0);
   }
 
+  /**
+   * @param message
+   * @param handlerInfos
+   * @param retryAttempt
+   * @return HTTPHandlerResponse
+   * @throws FrameParsingException
+   */
   private HTTPHandlerResponse handle(ASTMMessage message, Set<HTTPHandlerInfo> handlerInfos, int retryAttempt)
     throws FrameParsingException {
     Socket socket = null;

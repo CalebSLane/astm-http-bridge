@@ -10,6 +10,11 @@ public class HTTPForwardingHandlerInfo implements HTTPHandlerInfo {
   private int forwardPort;
   private ASTMVersion forwardAstmVersion = ASTMVersion.LIS01_A;
 
+  
+  /** 
+   * @param value
+   * @return boolean
+   */
   @Override
   public boolean supports(HTTPHandler value) {
     return value instanceof DefaultForwardingHTTPToASTMHandler;

@@ -54,6 +54,7 @@ public class ASTMReceiveThread extends Thread {
         return;
       } catch (InterruptedException e) {
         log.error("the thread was interrupted during receive protocol", e);
+        Thread.currentThread().interrupt();
         return;
       } catch (SocketTimeoutException e) {
         log.error("there was a timeout in the receive protocol at the socket level, abandoning message", e);
@@ -85,6 +86,10 @@ public class ASTMReceiveThread extends Thread {
     }
   }
 
+  
+  /** 
+   * @return boolean
+   */
   public boolean didReceiveEstablishmentSucceed() {
     return communicator.didReceiveEstablishmentSucceed();
   }
