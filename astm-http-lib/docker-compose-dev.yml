@@ -1,0 +1,17 @@
+version: "3.8"
+
+x-logging: &local-logging
+  driver: "local"
+  options:
+    max-size: "20m"
+    max-file: "50"
+
+services:
+  astm-http-lib:
+    container_name: astm-http-lib
+    build:
+      context: .
+      dockerfile: ./Dockerfile.dev
+    volumes:
+      - ./volumes/bridge-volume:/mount/host-volume #for copying stuff out of the container
+    logging: *local-logging
