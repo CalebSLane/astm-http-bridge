@@ -34,7 +34,9 @@ public enum HandleStatus {
   INTERRUPTED,
   /**
    * The message could not be handled successfully, the frames could not be interpreted as a message.
+   * @deprecated handlers will not be responsible for parsing frames.
    */
+  @Deprecated
   FAIL_FRAME_PARSING,
   /**
    * The message could not be handled successfully, it was left unhadled.

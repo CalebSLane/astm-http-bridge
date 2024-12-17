@@ -2,7 +2,6 @@ package org.itech.ahb.lib.http.handling;
 
 import java.util.Set;
 import org.itech.ahb.lib.astm.concept.ASTMMessage;
-import org.itech.ahb.lib.astm.exception.FrameParsingException;
 
 /**
  * This interface defines methods for handling HTTP requests.
@@ -22,9 +21,8 @@ public interface HTTPHandler {
    * @param message the ASTM message.
    * @param handlerInfo the set of handler information.
    * @return the HTTP handler response.
-   * @throws FrameParsingException if there is an error parsing the frame.
    */
-  HTTPHandlerResponse handle(ASTMMessage message, Set<HTTPHandlerInfo> handlerInfo) throws FrameParsingException;
+  HTTPHandlerResponse handle(ASTMMessage message, Set<HTTPHandlerInfo> handlerInfo);
 
   /**
    * Gets the name of the handler for logging purposes.

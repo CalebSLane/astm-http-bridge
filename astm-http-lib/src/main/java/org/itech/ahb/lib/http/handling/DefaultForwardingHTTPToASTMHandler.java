@@ -12,7 +12,6 @@ import org.itech.ahb.lib.astm.communication.GeneralASTMCommunicator;
 import org.itech.ahb.lib.astm.concept.ASTMMessage;
 import org.itech.ahb.lib.astm.concept.DefaultASTMMessage;
 import org.itech.ahb.lib.astm.exception.ASTMCommunicationException;
-import org.itech.ahb.lib.astm.exception.FrameParsingException;
 import org.itech.ahb.lib.astm.handling.ASTMHandlerService;
 import org.itech.ahb.lib.astm.handling.ASTMReceiveThread;
 import org.itech.ahb.lib.astm.interpretation.ASTMInterpreterFactory;
@@ -65,11 +64,9 @@ public class DefaultForwardingHTTPToASTMHandler implements HTTPHandler {
    * @param message the ASTM message.
    * @param handlerInfos the set of handler information.
    * @return the HTTP handler response.
-   * @throws FrameParsingException if there is an error parsing the frame.
    */
   @Override
-  public HTTPHandlerResponse handle(ASTMMessage message, Set<HTTPHandlerInfo> handlerInfos)
-    throws FrameParsingException {
+  public HTTPHandlerResponse handle(ASTMMessage message, Set<HTTPHandlerInfo> handlerInfos) {
     return handle(message, handlerInfos, 0);
   }
 
@@ -80,10 +77,8 @@ public class DefaultForwardingHTTPToASTMHandler implements HTTPHandler {
    * @param handlerInfo the set of handler information.
    * @param retryAttempt the number of times the message has been attempted to be sent.
    * @return the HTTP handler response.
-   * @throws FrameParsingException if there is an error parsing the frame.
    */
-  private HTTPHandlerResponse handle(ASTMMessage message, Set<HTTPHandlerInfo> handlerInfos, int retryAttempt)
-    throws FrameParsingException {
+  private HTTPHandlerResponse handle(ASTMMessage message, Set<HTTPHandlerInfo> handlerInfos, int retryAttempt) {
     Socket socket = null;
     Communicator communicator = null;
     String forwardingAddress = this.defaultForwardingAddress;
@@ -170,7 +165,6 @@ public class DefaultForwardingHTTPToASTMHandler implements HTTPHandler {
    * @param handlerInfo the set of handler information.
    * @param retryAttempt the number of times the message has been attempted to be sent.
    * @return the HTTP handler response.
-   * @throws FrameParsingException if there is an error parsing the frame.
    */
   private HTTPHandlerResponse handleLineContention(Communicator communicator, Socket socket, ASTMMessage message)
     throws ASTMCommunicationException, InterruptedException {

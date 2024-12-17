@@ -9,7 +9,6 @@ import java.util.Set;
 import java.util.stream.Collectors;
 import lombok.extern.slf4j.Slf4j;
 import org.itech.ahb.lib.astm.concept.ASTMMessage;
-import org.itech.ahb.lib.astm.exception.FrameParsingException;
 import org.itech.ahb.lib.common.handling.HandleStatus;
 
 /**
@@ -95,9 +94,6 @@ public class HTTPHandlerService {
           );
           log.debug("'" + messageHandler.getName() + "' finished handling astm http message");
           handleResponses.add(handleResponse);
-        } catch (FrameParsingException e) {
-          log.error("couldn't parse frames into a message", e);
-          handleResponses.add(new HTTPHandlerResponse("", HandleStatus.FAIL_FRAME_PARSING, false, messageHandler));
         } catch (RuntimeException e) {
           log.error(
             "unexpected error occurred during '" +

@@ -267,12 +267,10 @@ public class GeneralASTMCommunicator implements Communicator {
    * Instead the message is read character by character until the termination record is reached.
    *
    * @return the received ASTM message.
-   * @throws FrameParsingException if there is an error parsing the frame.
    * @throws ASTMCommunicationException if there is a communication error in the ASTM transmission protocol.
    * @throws IOException if an I/O error occurs.
    */
-  private ASTMMessage receiveInNonCompliantMode()
-    throws IOException, ASTMCommunicationException, FrameParsingException {
+  private ASTMMessage receiveInNonCompliantMode() throws IOException, ASTMCommunicationException {
     final FutureTask<ASTMMessage> recievedMessageFuture = new FutureTask<>(receiveIncompliantMessage());
     try {
       recievedMessageFuture.run();
@@ -290,10 +288,7 @@ public class GeneralASTMCommunicator implements Communicator {
    * Callable that recieves an ASTM message that is being sent non-compliantly (not using the ASTM transmission protocol).
    * Instead the message is read character by character until the termination record is reached.
    *
-   * @return the received ASTM message.
-   * @throws FrameParsingException if there is an error parsing the frame.
-   * @throws ASTMCommunicationException if there is a communication error in the ASTM transmission protocol.
-   * @throws IOException if an I/O error occurs.
+   * @return callable thread that returns the received ASTM message.
    */
   private Callable<ASTMMessage> receiveIncompliantMessage() {
     return new Callable<ASTMMessage>() {

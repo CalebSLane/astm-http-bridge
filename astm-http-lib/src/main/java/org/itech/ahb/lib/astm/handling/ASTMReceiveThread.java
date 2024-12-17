@@ -77,8 +77,11 @@ public class ASTMReceiveThread extends Thread {
       ASTMMessage message;
       try {
         message = communicator.receiveProtocol(lineWasContentious);
-      } catch (IllegalStateException | FrameParsingException | ASTMCommunicationException e) {
+      } catch (IllegalStateException | ASTMCommunicationException e) {
         log.error("an error occurred understanding what was received from the astm sender", e);
+        return;
+      } catch (FrameParsingException e) {
+        log.error("an error occurred parsing the received frames to an ASTM message", e);
         return;
       } catch (InterruptedException e) {
         log.error("the thread was interrupted during receive protocol", e);
