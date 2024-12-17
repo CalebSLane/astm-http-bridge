@@ -12,36 +12,58 @@ import org.itech.ahb.lib.astm.concept.ASTMMessage;
 import org.itech.ahb.lib.astm.exception.FrameParsingException;
 import org.itech.ahb.lib.common.handling.HandleStatus;
 
+/**
+ * This class provides a service layer for deciding which HTTP handlers should be called for a message and then calling them.
+ * Instead of directly calling a handler, this class should be used.
+ */
 @Slf4j
-public class HTTPHandlerMarshaller {
+public class HTTPHandlerService {
 
-  public enum MarshallerMode {
+  /**
+   *  The mode of the handler service. ex, Call all handlers or just the first one.
+   */
+  public enum Mode {
+    /**
+     *  Call all handlers that match the message.
+     */
     ALL,
+    /**
+     *  Call the first handler that matches the message.
+     */
     FIRST
   }
 
   private List<HTTPHandler> handlers;
-  private MarshallerMode mode;
+  private Mode mode;
 
-  public HTTPHandlerMarshaller(List<HTTPHandler> handlers, MarshallerMode mode) {
+  /**
+   * Create a new HTTPHandlerService.
+   * @param handlers the list of handlers to this handler service should be aware of.
+   * @param mode the mode this handler service should operate.
+   */
+  public HTTPHandlerService(List<HTTPHandler> handlers, Mode mode) {
     this.handlers = handlers;
     this.mode = mode;
   }
 
   /**
-   * @param message
-   * @return HTTPMarshallerResponse
+   * Calls the relevant handler(s) for the given ASTM message.
+   *
+   * @param message the ASTM message.
+   * @return the HTTP handler service response.
    */
-  public HTTPMarshallerResponse handle(ASTMMessage message) {
+  public HTTPHandlerServiceResponse handle(ASTMMessage message) {
     return handle(message, Set.of());
   }
 
   /**
-   * @param message
-   * @param handlersInfos
-   * @return HTTPMarshallerResponse
+   * Handles the given HTTP message with the provided handler information.
+   *
+   * @param message the ASTM message.
+   * @param handlersInfos the set of handler information.
+   * @return the HTTP handler service response.
    */
-  public HTTPMarshallerResponse handle(ASTMMessage message, Set<HTTPForwardingHandlerInfo> handlersInfos) {
+  public HTTPHandlerServiceResponse handle(ASTMMessage message, Set<HTTPForwardingHandlerInfo> handlersInfos) {
     Map<ASTMMessage, List<HTTPHandler>> messageHandlersMap = new HashMap<>();
     log.debug("finding a handler for astm http message: " + message.hashCode());
     for (HTTPHandler handler : handlers) {
@@ -51,7 +73,7 @@ public class HTTPHandlerMarshaller {
         matchingMessageHandlers.add(handler);
 
         messageHandlersMap.put(message, matchingMessageHandlers);
-        if (mode == MarshallerMode.FIRST) {
+        if (mode == Mode.FIRST) {
           log.debug("marshall mode is FIRST, proceeding with a single handler");
           break;
         }
@@ -59,7 +81,7 @@ public class HTTPHandlerMarshaller {
     }
     if (!messageHandlersMap.containsKey(message)) {
       log.warn("astm http message received but no handler was configured to handle the message");
-      return new HTTPMarshallerResponse();
+      return new HTTPHandlerServiceResponse();
     }
 
     List<HTTPHandlerResponse> handleResponses = new ArrayList<>();
@@ -90,6 +112,6 @@ public class HTTPHandlerMarshaller {
     }
     // TODO add some handle exception handling. for every handleResponse not success call messageHandler.handleFailure();
 
-    return new HTTPMarshallerResponse(handleResponses);
+    return new HTTPHandlerServiceResponse(handleResponses);
   }
 }

@@ -34,16 +34,43 @@ import org.itech.ahb.lib.astm.servlet.ASTMServlet.ASTMVersion;
 import org.itech.ahb.lib.util.LogUtil;
 import org.itech.ahb.lib.util.ThreadUtil;
 
-//If this class gets too complicated, separate out the LISA-01 and E1382-95 protocols
+//If this class gets too complicated, separate out the LISA-01 and E1382-95 protocols into separate classes
+/**
+ *  This class is a general communicator that can send and receive ASTM messages
+ * over protocols such as LIS01-A and E1382-95, as well as non-compliant transmissions
+ * where the sender sends ASTM messages by sending the message character by character
+ * without using control characters, frame numbers, or checksums.
+ */
 @Slf4j
 public class GeneralASTMCommunicator implements Communicator {
 
+  /**
+   *  Errors that can occur when receiving a frame.
+   */
   public enum FrameError {
+    /**
+     * The frame number is expected to be between 0-7 and increase by 1 each frame mod 8
+     */
     WRONG_FRAME_NUMBER,
+    /**
+     * Frame exceeds the maximum frame size
+     */
     MAX_SIZE_EXCEEDED,
+    /**
+     * Received a character in the the Data Content of Message that is not allowed
+     */
     ILLEGAL_CHAR,
+    /**
+     * Checksum does not match the calculated checksum
+     */
     BAD_CHECKSUM,
+    /**
+     * Start caracter is not the expected start character
+     */
     ILLEGAL_START,
+    /**
+     * End character is not the expected end character
+     */
     ILLEGAL_END
   }
 
@@ -102,7 +129,8 @@ public class GeneralASTMCommunicator implements Communicator {
   private static final int MAX_COMMUNICATOR_ID_COUNTER = 1024;
 
   /**
-   * @return int
+   * Gets a new ID for this communicator instance after incrementing the counter
+   * @return the new ID
    */
   private final int incrementAndGetId() {
     return COMMUNICATOR_ID_COUNTER.accumulateAndGet(
@@ -120,10 +148,21 @@ public class GeneralASTMCommunicator implements Communicator {
   private ASTMVersion astmVersion;
   private Boolean receiveEstablished = false;
 
+  /**
+   * Constructor for a GeneralASTMCommunicator, will assume the ASTM version is LIS01-A
+   * @param astmInterpreterFactory a factory that will create an interpreter for a received message
+   * @param socket the socket to communicate on
+   */
   public GeneralASTMCommunicator(ASTMInterpreterFactory astmInterpreterFactory, Socket socket) throws IOException {
     this(astmInterpreterFactory, socket, ASTMVersion.LIS01_A);
   }
 
+  /**
+   * Constructor for a GeneralASTMCommunicator with a specific ASTM version
+   * @param astmInterpreterFactory a factory that will create an interpreter for a received message
+   * @param socket the socket to communicate on
+   * @param astmVersion the ASTM version to communicate over
+   */
   public GeneralASTMCommunicator(ASTMInterpreterFactory astmInterpreterFactory, Socket socket, ASTMVersion astmVersion)
     throws IOException {
     communicatorId = Integer.toString(incrementAndGetId());
@@ -137,9 +176,6 @@ public class GeneralASTMCommunicator implements Communicator {
     this.astmVersion = astmVersion;
   }
 
-  /**
-   * @return String
-   */
   @Override
   public String getID() {
     return communicatorId;
@@ -226,6 +262,15 @@ public class GeneralASTMCommunicator implements Communicator {
     }
   }
 
+  /**
+   * Receives an ASTM message that is being sent non-compliantly (not using the ASTM transmission protocol).
+   * Instead the message is read character by character until the termination record is reached.
+   *
+   * @return the received ASTM message.
+   * @throws FrameParsingException if there is an error parsing the frame.
+   * @throws ASTMCommunicationException if there is a communication error in the ASTM transmission protocol.
+   * @throws IOException if an I/O error occurs.
+   */
   private ASTMMessage receiveInNonCompliantMode()
     throws IOException, ASTMCommunicationException, FrameParsingException {
     final FutureTask<ASTMMessage> recievedMessageFuture = new FutureTask<>(receiveIncompliantMessage());
@@ -241,6 +286,15 @@ public class GeneralASTMCommunicator implements Communicator {
     throw new ASTMCommunicationException("non compliant mode could not return a valid ASTM message");
   }
 
+  /**
+   * Callable that recieves an ASTM message that is being sent non-compliantly (not using the ASTM transmission protocol).
+   * Instead the message is read character by character until the termination record is reached.
+   *
+   * @return the received ASTM message.
+   * @throws FrameParsingException if there is an error parsing the frame.
+   * @throws ASTMCommunicationException if there is a communication error in the ASTM transmission protocol.
+   * @throws IOException if an I/O error occurs.
+   */
   private Callable<ASTMMessage> receiveIncompliantMessage() {
     return new Callable<ASTMMessage>() {
       @Override
@@ -270,6 +324,15 @@ public class GeneralASTMCommunicator implements Communicator {
     };
   }
 
+  /**
+   * Receives an ASTM message that is being sent compliantly over the ASTM transmission protocol.
+   * This version supports LISA-01 and E1382-95 protocols
+   *
+   * @return the received ASTM message.
+   * @throws FrameParsingException if there is an error parsing the frame.
+   * @throws ASTMCommunicationException if there is a communication error in the ASTM transmission protocol.
+   * @throws IOException if an I/O error occurs.
+   */
   private ASTMMessage receiveInCompliantMode() throws IOException, ASTMCommunicationException, FrameParsingException {
     List<ASTMFrame> frames = new ArrayList<>();
     int i = 0;
@@ -332,6 +395,13 @@ public class GeneralASTMCommunicator implements Communicator {
     return astmInterpreterFactory.createInterpreterForFrames(frames).interpretFramesToASTMMessage(frames);
   }
 
+  /**
+   * Creates a callable task that reads a single frame and adds it to the list of frames.
+   *
+   * @param frames the list of frames that this task will add the next frame to.
+   * @return a callable task that returns the information about the frame that was read
+   * @throws IOException if an I/O error occurs.
+   */
   private Callable<ReadFrameInfo> receiveNextFrameTask(List<ASTMFrame> frames) throws IOException {
     return new Callable<ReadFrameInfo>() {
       @Override
@@ -358,6 +428,15 @@ public class GeneralASTMCommunicator implements Communicator {
     };
   }
 
+  /**
+   * Read the next frame from the reader and add it to the list of frames.
+   *
+   * @param frames the list of frames that this task will add the next frame to.
+   * @param expectedFrameNumber the expected number that the next frame whouls start with.
+   * @return a Set of issues with the frame that was received. This will be empty if no issue was detected.
+   * @throws IOException if an I/O error occurs.
+   * @throws InterruptedException if the operation is interrupted.
+   */
   private Set<FrameError> readNextCompliantFrame(List<ASTMFrame> frames, int expectedFrameNumber)
     throws IOException, InterruptedException {
     log.debug("reading frame...");
@@ -443,6 +522,14 @@ public class GeneralASTMCommunicator implements Communicator {
     return frameErrors;
   }
 
+  /**
+   * Read the next ASTM record and add it to the list of ASTM records
+   *
+   * @param records the list of records that this method will add to
+   * @return a Set of issues with the "frame" (record in this case) that was received. for  This will be empty if no issue was detected.
+   * @throws IOException if an I/O error occurs.
+   * @throws InterruptedException if the operation is interrupted.
+   */
   private Set<FrameError> readNextIncompliantRecord(List<ASTMRecord> records) throws IOException, InterruptedException {
     log.debug("reading incompliant record...");
     Set<FrameError> recordErrors = new HashSet<>();
@@ -565,6 +652,11 @@ public class GeneralASTMCommunicator implements Communicator {
     return new SendResult(false, false);
   }
 
+  /**
+   * Sends the signal to establish communication with the receiver, beginning the "establishment phase" of the ASTM transmission protocol.
+   *
+   * @return a callable task that returns the response character from the receiver.
+   */
   private Callable<Character> establishmentTaskSend() {
     return new Callable<Character>() {
       @Override
@@ -604,6 +696,12 @@ public class GeneralASTMCommunicator implements Communicator {
     };
   }
 
+  /**
+   * Creates a callable task that sends the next ASTM frame to the receiver.
+   *
+   * @param frame the ASTM frame to send to the reciever.
+   * @return a callable task that sends the next ASTM frame and returns true if the frame was sent successfully.
+   */
   private Callable<Boolean> sendNextFrameTask(ASTMFrame frame) {
     return new Callable<Boolean>() {
       @Override
@@ -629,12 +727,24 @@ public class GeneralASTMCommunicator implements Communicator {
     };
   }
 
+  /**
+   * Sends the termination signal to enter the termination phase of the ASTM transmission protocol.
+   */
   private void terminationSignal() {
     log.debug("sending '" + LogUtil.convertForDisplay(EOT) + "' as termination for exchange");
     writer.append(EOT);
     writer.flush();
   }
 
+  /**
+   * Sends the termination signal to enter the termination phase of the ASTM transmission protocol.
+   *
+   * @param checksum the checksum that the calculated checksum should match.
+   * @param frameNumber the frame number character to be used in the checksum calculation.
+   * @param frame the frame to be used in the checksum calculation.
+   * @param frameTerminator the frame terminator character to be used in the checksum calculation.
+   * @return true if the checksum matches the calculated checksum.
+   */
   private boolean checksumFits(String checksum, char frameNumber, String frame, char frameTerminator) {
     log.trace(
       "received: '" + LogUtil.convertForDisplay(checksum) + "'. Expecting 2 base 16 checksum characters [00-FF]"
@@ -642,6 +752,14 @@ public class GeneralASTMCommunicator implements Communicator {
     return checksum.equals(checksumCalc(frameNumber, frame, frameTerminator));
   }
 
+  /**
+   * Calculates the checksum from the parameters.
+   *
+   * @param frameNumber the frame number character to be used in the checksum calculation.
+   * @param frame the frame to be used in the checksum calculation.
+   * @param frameTerminator the frame terminator character to be used in the checksum calculation.
+   * @return the calculated checksum as a String.
+   */
   private String checksumCalc(char frameNumber, String frame, char frameTerminator) {
     int computedChecksum = 0;
     computedChecksum += (byte) frameNumber;
@@ -655,6 +773,9 @@ public class GeneralASTMCommunicator implements Communicator {
     return checksum;
   }
 
+  /**
+   * Object for holding information about the reading a frame.
+   */
   @Data
   @AllArgsConstructor
   private class ReadFrameInfo {

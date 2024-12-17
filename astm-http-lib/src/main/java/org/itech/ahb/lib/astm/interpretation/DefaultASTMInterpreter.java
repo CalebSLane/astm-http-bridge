@@ -13,17 +13,15 @@ import org.itech.ahb.lib.astm.concept.DefaultASTMMessage;
 import org.itech.ahb.lib.astm.concept.DefaultASTMRecord;
 import org.itech.ahb.lib.astm.exception.FrameParsingException;
 
+/**
+ * This class provides a default implementation of the ASTMInterpreter interface for interpreting many of the default object types.
+ */
 @Slf4j
 public class DefaultASTMInterpreter implements ASTMInterpreter {
 
   private static final String RECORD_SEPERATOR = Character.toString(0x0D); // CR
   private static final String MESSAGE_TERMINATOR_RECORD_START = "L";
 
-  /**
-   * @param frames
-   * @return ASTMMessage
-   * @throws FrameParsingException
-   */
   @Override
   public ASTMMessage interpretFramesToASTMMessage(List<ASTMFrame> frames) throws FrameParsingException {
     log.debug("interpreting frames as astm messages...");
@@ -51,8 +49,10 @@ public class DefaultASTMInterpreter implements ASTMInterpreter {
   }
 
   /**
-   * @param frame
-   * @return boolean
+   * Checks if a frame contains a message terminator.
+   *
+   * @param frame the ASTM frame.
+   * @return true if the frame contains a message terminator, false otherwise.
    */
   private boolean frameContainsMessageTerminator(ASTMFrame frame) {
     String[] lines = frame.getText().split(RECORD_SEPERATOR);

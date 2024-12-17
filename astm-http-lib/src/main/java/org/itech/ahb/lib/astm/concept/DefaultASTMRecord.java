@@ -7,13 +7,14 @@ public class DefaultASTMRecord implements ASTMRecord {
 
   private String record;
 
+  /**
+   * Constructor for creating an ASTM record by passing in the record as a string.
+   * @param record the record text to store.
+   */
   public DefaultASTMRecord(String record) {
     this.record = record;
   }
 
-  /**
-   * @return int
-   */
   @Override
   public int getRecordLength() {
     if (record == null) {
@@ -23,9 +24,6 @@ public class DefaultASTMRecord implements ASTMRecord {
     }
   }
 
-  /**
-   * @return String
-   */
   public String getRecord() {
     if (record == null) {
       return "";

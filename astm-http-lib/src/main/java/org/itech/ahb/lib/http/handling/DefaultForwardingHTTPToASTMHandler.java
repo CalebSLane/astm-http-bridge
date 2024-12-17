@@ -13,12 +13,16 @@ import org.itech.ahb.lib.astm.concept.ASTMMessage;
 import org.itech.ahb.lib.astm.concept.DefaultASTMMessage;
 import org.itech.ahb.lib.astm.exception.ASTMCommunicationException;
 import org.itech.ahb.lib.astm.exception.FrameParsingException;
-import org.itech.ahb.lib.astm.handling.ASTMHandlerMarshaller;
+import org.itech.ahb.lib.astm.handling.ASTMHandlerService;
 import org.itech.ahb.lib.astm.handling.ASTMReceiveThread;
 import org.itech.ahb.lib.astm.interpretation.ASTMInterpreterFactory;
 import org.itech.ahb.lib.astm.servlet.ASTMServlet.ASTMVersion;
 import org.itech.ahb.lib.common.handling.HandleStatus;
 
+/**
+ * This class is a default handler that is at the core of this library.
+ * It takes an ASTM message that and forwards it over an ASTM transmission protocol.
+ */
 @Slf4j
 public class DefaultForwardingHTTPToASTMHandler implements HTTPHandler {
 
@@ -26,30 +30,42 @@ public class DefaultForwardingHTTPToASTMHandler implements HTTPHandler {
   private final int defaultForwardingPort;
   private final ASTMVersion defaultForwardingProtocol;
   private final ASTMInterpreterFactory interpreterFactory;
-  private final ASTMHandlerMarshaller astmHandlerMarshaller; // this is necessary in case of line contention
+  private final ASTMHandlerService astmHandlerService; // this is necessary in case of line contention
 
   private static final int MAX_FORWARD_RETRY_ATTEMPTS = 3; // this is not officially part of the astm standard
   private static final int SEND_ATTEMPTS_WAIT = 10; // in seconds the amount of time to wait before trying to submit again
   private static final int LINE_CONTENTION_REATTEMPT_TIMEOUT = 20; // in seconds
 
+  /**
+   * Constructs a new DefaultForwardingHTTPToASTMHandler with the
+   * specified forwarding address, port, handler marshaller, and interpreter factory.
+   * Default ASTM version is LIS01_A.
+   *
+   * @param forwardingAddress the web address to forward the message to.
+   * @param forwardingPort the port to forward the message to.
+   * @param astmHandlerService the handler service to use for handling messages.
+   * @param interpreterFactory the interpreter factory to use for interpreting messages.
+   */
   public DefaultForwardingHTTPToASTMHandler(
     String forwardingAddress,
     int forwardingPort,
-    ASTMHandlerMarshaller astmHandlerMarshaller,
+    ASTMHandlerService astmHandlerService,
     ASTMInterpreterFactory interpreterFactory
   ) {
     this.defaultForwardingAddress = forwardingAddress;
     this.defaultForwardingPort = forwardingPort;
     this.defaultForwardingProtocol = ASTMVersion.LIS01_A;
     this.interpreterFactory = interpreterFactory;
-    this.astmHandlerMarshaller = astmHandlerMarshaller;
+    this.astmHandlerService = astmHandlerService;
   }
 
   /**
-   * @param message
-   * @param handlerInfos
-   * @return HTTPHandlerResponse
-   * @throws FrameParsingException
+   * Handles the given ASTM message with the provided handler information by forwarding it over HTTP(S)
+   *
+   * @param message the ASTM message.
+   * @param handlerInfos the set of handler information.
+   * @return the HTTP handler response.
+   * @throws FrameParsingException if there is an error parsing the frame.
    */
   @Override
   public HTTPHandlerResponse handle(ASTMMessage message, Set<HTTPHandlerInfo> handlerInfos)
@@ -58,11 +74,13 @@ public class DefaultForwardingHTTPToASTMHandler implements HTTPHandler {
   }
 
   /**
-   * @param message
-   * @param handlerInfos
-   * @param retryAttempt
-   * @return HTTPHandlerResponse
-   * @throws FrameParsingException
+   * Handles the given ASTM message with the provided handler information by forwarding it over HTTP(S)
+   *
+   * @param message the ASTM message.
+   * @param handlerInfo the set of handler information.
+   * @param retryAttempt the number of times the message has been attempted to be sent.
+   * @return the HTTP handler response.
+   * @throws FrameParsingException if there is an error parsing the frame.
    */
   private HTTPHandlerResponse handle(ASTMMessage message, Set<HTTPHandlerInfo> handlerInfos, int retryAttempt)
     throws FrameParsingException {
@@ -141,10 +159,23 @@ public class DefaultForwardingHTTPToASTMHandler implements HTTPHandler {
     }
   }
 
+  /**
+   * Handles line contention when it occurs by instead of sending, reverting to listenting mode using the same socket.
+   * If the message being forwarded was 0 length, it is assumed that the message was a ping to trigger an action from the receiver,
+   * and the line contention represents the successful completion of the action.
+   *
+   * If a non-0 length message was being sent, then this is considered a failure
+   *
+   * @param message the ASTM message.
+   * @param handlerInfo the set of handler information.
+   * @param retryAttempt the number of times the message has been attempted to be sent.
+   * @return the HTTP handler response.
+   * @throws FrameParsingException if there is an error parsing the frame.
+   */
   private HTTPHandlerResponse handleLineContention(Communicator communicator, Socket socket, ASTMMessage message)
     throws ASTMCommunicationException, InterruptedException {
     // the communicator must remain open to receive the line contention. The thread will close the socket
-    ASTMReceiveThread receiveThread = new ASTMReceiveThread(communicator, socket, astmHandlerMarshaller, true);
+    ASTMReceiveThread receiveThread = new ASTMReceiveThread(communicator, socket, astmHandlerService, true);
     receiveThread.run();
     log.debug("waiting after line contention to see if sender has a message that needs to be received...");
     TimeUnit.SECONDS.sleep(LINE_CONTENTION_REATTEMPT_TIMEOUT);

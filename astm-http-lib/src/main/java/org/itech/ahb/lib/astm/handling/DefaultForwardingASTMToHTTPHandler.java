@@ -13,6 +13,11 @@ import org.itech.ahb.lib.astm.concept.DefaultASTMMessage;
 import org.itech.ahb.lib.common.handling.HandleStatus;
 import org.itech.ahb.lib.util.LogUtil;
 
+/**
+ * This class is a default handler that is at the core of this library.
+ * It takes an ASTM message and forwards it over HTTP(S), optionally with a username and password
+ * for BASIC authentication.
+ */
 @Slf4j
 public class DefaultForwardingASTMToHTTPHandler implements ASTMHandler {
 
@@ -20,12 +25,24 @@ public class DefaultForwardingASTMToHTTPHandler implements ASTMHandler {
   private final String username;
   private final char[] password;
 
+  /**
+   * Constructs a new DefaultForwardingASTMToHTTPHandler with a URI endpoint it will forward to.
+   *
+   * @param forwardingUri the endpoint for ASTM message to be forwarded to over HTTP(S).
+   */
   public DefaultForwardingASTMToHTTPHandler(URI forwardingUri) {
     this.forwardingUri = forwardingUri;
     this.username = null;
     this.password = new char[0];
   }
 
+  /**
+   * Constructs a new DefaultForwardingASTMToHTTPHandler with a URI endpoint it will forward to and a username/password combo to use for authentication.
+   *
+   * @param forwardingUri the endpoint for ASTM message to be forwarded to over HTTP(S).
+   * @param username the username.
+   * @param password the password.
+   */
   public DefaultForwardingASTMToHTTPHandler(URI forwardingUri, String username, char[] password) {
     this.forwardingUri = forwardingUri;
     this.username = username;
@@ -33,8 +50,10 @@ public class DefaultForwardingASTMToHTTPHandler implements ASTMHandler {
   }
 
   /**
-   * @param message
-   * @return ASTMHandlerResponse
+   * Handles the given ASTM message by forwarding it over HTTP(S) to the URI endpoint that was passed into this class.
+   *
+   * @param message the ASTM message.
+   * @return the ASTM handler response.
    */
   @Override
   public ASTMHandlerResponse handle(ASTMMessage message) {
@@ -68,6 +87,8 @@ public class DefaultForwardingASTMToHTTPHandler implements ASTMHandler {
   }
 
   /**
+   * This handler matches all DefaultASTMMessage messages.
+   *
    * @param message
    * @return boolean
    */
@@ -77,8 +98,7 @@ public class DefaultForwardingASTMToHTTPHandler implements ASTMHandler {
   }
 
   /**
-   * @param message
-   * @return boolean
+   * @return the name of this handler for logging purposes
    */
   @Override
   public String getName() {

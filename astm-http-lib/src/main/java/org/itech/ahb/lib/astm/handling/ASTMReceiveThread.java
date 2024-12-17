@@ -10,38 +10,66 @@ import org.itech.ahb.lib.astm.exception.ASTMCommunicationException;
 import org.itech.ahb.lib.astm.exception.FrameParsingException;
 import org.itech.ahb.lib.common.handling.HandleStatus;
 
+/**
+ * This class represents a thread that controls the flow of receiving ASTM messages via a communicator
+ * and then calling the handler service to process the message.
+ */
 @Slf4j
 public class ASTMReceiveThread extends Thread {
 
   private final Socket socket;
   private final Communicator communicator;
-  private ASTMHandlerMarshaller astmHandlerMarshaller;
+  private ASTMHandlerService astmHandlerService;
   private boolean lineWasContentious;
 
-  public ASTMReceiveThread(Communicator communicator, Socket socket, ASTMHandlerMarshaller astmHandlerMarshaller) {
+  /**
+   * Constructs a new ASTMReceiveThread with the specified communicator, socket, and handler service.
+   *
+   * @param communicator the communicator to use for receiving messages.
+   * @param socket the socket to use for communication.
+   * @param astmHandlerService the handler service to use for processing messages.
+   */
+  public ASTMReceiveThread(Communicator communicator, Socket socket, ASTMHandlerService astmHandlerService) {
     this.communicator = communicator;
     this.socket = socket;
-    this.astmHandlerMarshaller = astmHandlerMarshaller;
+    this.astmHandlerService = astmHandlerService;
   }
 
-  public ASTMReceiveThread(Communicator communicator, ASTMHandlerMarshaller astmHandlerMarshaller) {
+  /**
+   * Constructs a new ASTMReceiveThread with the specified communicator and handler service.
+   *
+   * @param communicator the communicator to use for receiving messages.
+   * @param astmHandlerService the handler service to use for processing messages.
+   */
+  public ASTMReceiveThread(Communicator communicator, ASTMHandlerService astmHandlerService) {
     this.communicator = communicator;
     this.socket = null;
-    this.astmHandlerMarshaller = astmHandlerMarshaller;
+    this.astmHandlerService = astmHandlerService;
   }
 
+  /**
+   * Constructs a new ASTMReceiveThread with the specified communicator, socket, handler service, and line contention flag.
+   *
+   * @param communicator the communicator to use for receiving messages.
+   * @param socket the socket to use for communication.
+   * @param astmHandlerService the handler service to use for processing messages.
+   * @param lineWasContentious indicates if the line was contentious.
+   */
   public ASTMReceiveThread(
     Communicator communicator,
     Socket socket,
-    ASTMHandlerMarshaller astmHandlerMarshaller,
+    ASTMHandlerService astmHandlerService,
     boolean lineWasContentious
   ) {
     this.communicator = communicator;
     this.socket = socket;
-    this.astmHandlerMarshaller = astmHandlerMarshaller;
+    this.astmHandlerService = astmHandlerService;
     this.lineWasContentious = lineWasContentious;
   }
 
+  /**
+   * Runs the thread to receive and handle ASTM messages.
+   */
   @Override
   public void run() {
     log.trace("thread started to receive ASTM message");
@@ -60,7 +88,7 @@ public class ASTMReceiveThread extends Thread {
         log.error("there was a timeout in the receive protocol at the socket level, abandoning message", e);
         return;
       }
-      ASTMMarshallerResponse response = astmHandlerMarshaller.handle(message);
+      ASTMHandlerServiceResponse response = astmHandlerService.handle(message);
       if (response.getResponses() == null || response.getResponses().size() == 0) {
         log.error("message was unhandled");
       } else {
@@ -86,9 +114,10 @@ public class ASTMReceiveThread extends Thread {
     }
   }
 
-  
-  /** 
-   * @return boolean
+  /**
+   * Checks if the establishment phase of the communication succeeded.
+   *
+   * @return true if the establishment succeeded, false otherwise.
    */
   public boolean didReceiveEstablishmentSucceed() {
     return communicator.didReceiveEstablishmentSucceed();
