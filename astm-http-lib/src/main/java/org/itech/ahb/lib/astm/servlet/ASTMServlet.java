@@ -29,7 +29,7 @@ public class ASTMServlet {
     NON_COMPLIANT
   }
 
-  private final ASTMHandlerService astmMessageMarshaller;
+  private final ASTMHandlerService astmHandlerService;
   private final ASTMInterpreterFactory astmInterpreterFactory;
   private final int listenPort;
   private final ASTMVersion astmVersion;
@@ -37,18 +37,18 @@ public class ASTMServlet {
   /**
    * Constructs a new ASTMServlet with the specified handler service, interpreter factory, listen port, and ASTM version.
    *
-   * @param astmMessageMarshaller the handler service to use for processing messages.
+   * @param astmHandlerService the handler service to use for processing messages.
    * @param astmInterpreterFactory the interpreter factory to use for interpreting messages.
    * @param listenPort the port to listen on for ASTM messages.
    * @param astmVersion the ASTM version to use for communication.
    */
   public ASTMServlet(
-    ASTMHandlerService astmMessageMarshaller,
+    ASTMHandlerService astmHandlerService,
     ASTMInterpreterFactory astmInterpreterFactory,
     int listenPort,
     ASTMVersion astmVersion
   ) {
-    this.astmMessageMarshaller = astmMessageMarshaller;
+    this.astmHandlerService = astmHandlerService;
     this.astmInterpreterFactory = astmInterpreterFactory;
     this.listenPort = listenPort;
     this.astmVersion = astmVersion;
@@ -71,7 +71,7 @@ public class ASTMServlet {
         new ASTMReceiveThread(
           new GeneralASTMCommunicator(astmInterpreterFactory, s, astmVersion),
           s,
-          astmMessageMarshaller
+          astmHandlerService
         ).start();
       }
     } catch (Exception e) {

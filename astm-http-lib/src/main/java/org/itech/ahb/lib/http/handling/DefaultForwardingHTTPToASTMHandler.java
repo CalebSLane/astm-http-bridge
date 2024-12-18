@@ -37,11 +37,11 @@ public class DefaultForwardingHTTPToASTMHandler implements HTTPHandler {
 
   /**
    * Constructs a new DefaultForwardingHTTPToASTMHandler with the
-   * specified forwarding address, port, handler marshaller, and interpreter factory.
+   * specified forwarding address, port, handler service, and interpreter factory.
    * Default ASTM version is LIS01_A.
    *
-   * @param forwardingAddress the web address to forward the message to.
-   * @param forwardingPort the port to forward the message to.
+   * @param forwardingAddress the default web address to forward the message to.
+   * @param forwardingPort the default port to forward the message to.
    * @param astmHandlerService the handler service to use for handling messages.
    * @param interpreterFactory the interpreter factory to use for interpreting messages.
    */

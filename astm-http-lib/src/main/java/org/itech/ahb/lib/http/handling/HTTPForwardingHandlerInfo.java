@@ -4,7 +4,7 @@ import lombok.Data;
 import org.itech.ahb.lib.astm.servlet.ASTMServlet.ASTMVersion;
 
 /**
- * This class holds information that is used for forwrding an ASTM message over HTTP(S).
+ * This class holds information that is used for forwarding an ASTM message over an ASTM transmission protocol.
  */
 @Data
 public class HTTPForwardingHandlerInfo implements HTTPHandlerInfo {
