@@ -34,7 +34,9 @@ import org.itech.ahb.lib.astm.servlet.ASTMServlet.ASTMVersion;
 import org.itech.ahb.lib.util.LogUtil;
 import org.itech.ahb.lib.util.ThreadUtil;
 
-//If this class gets too complicated, separate out the LISA-01 and E1382-95 protocols into separate classes
+//If this class gets too complicated, separate out the
+// LISA-01 and E1382-95 protocols into separate classes or separate sending from receiving.
+// Also separate out the non-compliant transmission protocol into a separate class.
 /**
  *  This class is a general communicator that can send and receive ASTM messages
  * over protocols such as LIS01-A and E1382-95, as well as non-compliant transmissions
@@ -263,8 +265,8 @@ public class GeneralASTMCommunicator implements Communicator {
   }
 
   /**
-   * Receives an ASTM message that is being sent non-compliantly (not using the ASTM transmission protocol).
-   * Instead the message is read character by character until the termination record is reached.
+   * Receives an ASTM message that is being sent non-compliantly (not using a proper ASTM transmission protocol).
+   * The non-compliant mode reads character by character until the termination record is reached.
    *
    * @return the received ASTM message.
    * @throws ASTMCommunicationException if there is a communication error in the ASTM transmission protocol.
@@ -340,7 +342,7 @@ public class GeneralASTMCommunicator implements Communicator {
       try {
         recievedFrameFuture.run();
         ReadFrameInfo frameInfo = recievedFrameFuture.get(RECIEVE_FRAME_TIMEOUT, TimeUnit.SECONDS);
-        if (frameInfo.getStartChar() != EOT) {
+        if (frameInfo.getStartChar() == EOT) {
           break;
         }
         Set<FrameError> frameErrors = frameInfo.getFrameErrors();
@@ -369,7 +371,7 @@ public class GeneralASTMCommunicator implements Communicator {
     if (exceptions.size() > MAX_FRAME_RETRY_ATTEMPTS) {
       log.error("MAX_FRAME_RETRY_ATTEMPTS reached for frame");
       for (Exception e : exceptions) {
-        log.error(e.getMessage());
+        log.error("" + e.getMessage());
       }
       //sender is supposed to enter the termination phase when max attempts are reached, which means EOT is expected, but is irrelevant)
       try {
@@ -451,9 +453,11 @@ public class GeneralASTMCommunicator implements Communicator {
     while (curChar != ETB && curChar != ETX) {
       if (RESTRICTED_CHARACTERS.contains(curChar)) {
         frameErrors.add(FrameError.ILLEGAL_CHAR);
+        log.error("illegal character detected: '" + LogUtil.convertForDisplay(curChar) + "'.");
       }
       if ((astmVersion == ASTMVersion.LIS01_A ? MAX_TEXT_SIZE : MAX_TEXT_SIZE_E138195) < frameSize) {
         frameErrors.add(FrameError.MAX_SIZE_EXCEEDED);
+        log.error("max frame size exceeded character.");
       }
       textBuilder.append(curChar);
       ++frameSize;
@@ -510,6 +514,8 @@ public class GeneralASTMCommunicator implements Communicator {
       frame.setText(text);
       frames.add(frame);
       log.debug("frame added to list of frames");
+    } else {
+      log.debug("frame not added to list of frames due to errors: " + frameErrors);
     }
     if (Thread.interrupted()) {
       throw new InterruptedException();
@@ -580,7 +586,7 @@ public class GeneralASTMCommunicator implements Communicator {
     }
 
     if (established) {
-      log.trace("sendProtocol: established");
+      log.trace("established");
     } else if (nakReceived) {
       return new SendResult(false, true);
     } else {

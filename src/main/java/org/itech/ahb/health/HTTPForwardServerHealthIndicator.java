@@ -13,6 +13,16 @@ import org.springframework.boot.actuate.health.Health;
 import org.springframework.boot.actuate.health.HealthIndicator;
 import org.springframework.stereotype.Component;
 
+/**
+ * Health indicator for the connection between this server and the HTTP server that ASTM messages should be forwarded to.
+ * Useful for manually checking the health of the application/connections and for automatic monitoring.
+ * Enabled/disabled via configuration property.
+ *
+ * management:
+ *   health:
+ *     httpforward:
+ *       enabled: true
+ */
 @Component("httpforward")
 @ConditionalOnEnabledHealthIndicator("httpforward")
 @Slf4j
@@ -20,10 +30,20 @@ public class HTTPForwardServerHealthIndicator implements HealthIndicator {
 
   private final HTTPForwardServerConfigurationProperties properties;
 
+  /**
+   * Constructor for HTTPForwardServerHealthIndicator.
+   *
+   * @param properties the HTTP forward server configuration properties
+   */
   public HTTPForwardServerHealthIndicator(HTTPForwardServerConfigurationProperties properties) {
     this.properties = properties;
   }
 
+  /**
+   * Checks the health of the HTTP forward server.
+   *
+   * @return the health status
+   */
   @Override
   public Health health() {
     if (properties.getHealthUri() == null) {

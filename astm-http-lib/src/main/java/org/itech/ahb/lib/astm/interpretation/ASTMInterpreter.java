@@ -20,14 +20,6 @@ public interface ASTMInterpreter {
   ASTMMessage interpretFramesToASTMMessage(List<ASTMFrame> frames) throws FrameParsingException;
 
   /**
-   * Interprets an ASTM record as a list of ASTM frames.
-   *
-   * @param record the ASTM record.
-   * @return the list of ASTM frames that would make up this record for transmission.
-   */
-  List<ASTMFrame> interpretASTMRecordsToFrames(ASTMRecord record);
-
-  /**
    * Interprets an ASTM message as a list of ASTM frames.
    *
    * @param message the ASTM message.

@@ -64,6 +64,7 @@ public class ASTMHandlerService {
   public ASTMHandlerServiceResponse handle(ASTMMessage message, Set<ASTMForwardingHandlerInfo> handlersInfos) {
     Map<ASTMMessage, List<ASTMHandler>> messageHandlersMap = new HashMap<>();
     log.debug("finding a handler for astm message: " + message.hashCode());
+    log.trace("message: '" + message.getMessage() + "'");
     for (ASTMHandler handler : handlers) {
       if (handler.matches(message)) {
         log.debug("handler: '" + handler.getName() + "' found for astm message: " + message.hashCode());

@@ -7,7 +7,7 @@ import lombok.RequiredArgsConstructor;
 import org.itech.ahb.lib.common.handling.HandlerServiceResponse;
 
 /**
- * This class represents the response from an HTTP handler service. ie. a collection of responses from individual hadlers.
+ * This class represents the response from an HTTP handler service. ie. a collection of responses from individual handlers.
  */
 @Data
 @AllArgsConstructor

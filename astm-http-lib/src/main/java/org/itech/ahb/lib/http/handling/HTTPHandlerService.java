@@ -73,7 +73,7 @@ public class HTTPHandlerService {
 
         messageHandlersMap.put(message, matchingMessageHandlers);
         if (mode == Mode.FIRST) {
-          log.debug("marshall mode is FIRST, proceeding with a single handler");
+          log.debug("mode is FIRST, proceeding with a single handler");
           break;
         }
       }
@@ -87,6 +87,7 @@ public class HTTPHandlerService {
     log.debug("handling astm http message...");
     for (Entry<ASTMMessage, List<HTTPHandler>> matchingMessageHandlers : messageHandlersMap.entrySet()) {
       for (HTTPHandler messageHandler : matchingMessageHandlers.getValue()) {
+        log.trace("messageHandler astm http message...");
         try {
           HTTPHandlerResponse handleResponse = messageHandler.handle(
             matchingMessageHandlers.getKey(),

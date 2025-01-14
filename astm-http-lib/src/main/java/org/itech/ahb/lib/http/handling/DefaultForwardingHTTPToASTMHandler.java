@@ -79,6 +79,7 @@ public class DefaultForwardingHTTPToASTMHandler implements HTTPHandler {
    * @return the HTTP handler response.
    */
   private HTTPHandlerResponse handle(ASTMMessage message, Set<HTTPHandlerInfo> handlerInfos, int retryAttempt) {
+    log.trace(this.getName() + ": " + this.hashCode() + " " + "retry attempt: " + retryAttempt);
     Socket socket = null;
     Communicator communicator = null;
     String forwardingAddress = this.defaultForwardingAddress;
@@ -99,7 +100,7 @@ public class DefaultForwardingHTTPToASTMHandler implements HTTPHandler {
       }
     }
     try {
-      if (retryAttempt > 0) {
+      if (retryAttempt > 0 && retryAttempt <= MAX_FORWARD_RETRY_ATTEMPTS) {
         log.debug("waiting to reattempt sending to astm server...");
         Thread.sleep(SEND_ATTEMPTS_WAIT * 1000);
         log.debug("reattempting forward to astm server...");

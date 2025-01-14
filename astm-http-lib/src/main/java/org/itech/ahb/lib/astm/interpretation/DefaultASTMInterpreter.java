@@ -55,15 +55,17 @@ public class DefaultASTMInterpreter implements ASTMInterpreter {
    * @return true if the frame contains a message terminator, false otherwise.
    */
   private boolean frameContainsMessageTerminator(ASTMFrame frame) {
+    log.trace("checking if frame contains message terminator...");
     String[] lines = frame.getText().split(RECORD_SEPERATOR);
     if (lines[lines.length - 1].startsWith(MESSAGE_TERMINATOR_RECORD_START)) {
+      log.trace("frame contains message terminator");
       return true;
     }
+    log.trace("frame does NOT contain message terminator");
     return false;
   }
 
-  @Override
-  public List<ASTMFrame> interpretASTMRecordsToFrames(ASTMRecord record) {
+  private List<ASTMFrame> interpretASTMRecordsToFrames(ASTMRecord record, int recordNumber) {
     log.debug("interpreting astm record as frames...");
     List<ASTMFrame> frames = new ArrayList<>();
     String[] frameTexts = record.getRecord().split("(?<=\\G.{" + GeneralASTMCommunicator.MAX_TEXT_SIZE + "})");
@@ -71,11 +73,11 @@ public class DefaultASTMInterpreter implements ASTMInterpreter {
     for (int i = 0; i < frameTexts.length; i++) {
       ASTMFrame curFrame = new DefaultASTMFrame();
       curFrame.setText(frameTexts[i]);
-      curFrame.setFrameNumber((i + 1) % 8);
       curFrame.setType(i != (frameTexts.length - 1) ? FrameType.INTERMEDIATE : FrameType.END);
       frames.add(curFrame);
       log.trace(curFrame.toString());
     }
+    log.trace("record was interpreted across " + frames.size() + " frames");
     log.debug("finished interpreting astm record as frames");
     return frames;
   }
@@ -85,9 +87,15 @@ public class DefaultASTMInterpreter implements ASTMInterpreter {
     log.debug("interpreting astm messages as frames...");
     List<ASTMFrame> frames = new ArrayList<>();
     log.trace("astm message: " + message.getMessage());
-    for (ASTMRecord record : message.getRecords()) {
-      frames.addAll(interpretASTMRecordsToFrames(record));
+    for (int i = 0; i < message.getRecords().size(); i++) {
+      frames.addAll(interpretASTMRecordsToFrames(message.getRecords().get(i), i));
     }
+    for (int i = 0; i < frames.size(); i++) {
+      frames.get(i).setFrameNumber((i + 1) % 8);
+    }
+
+    log.trace("message was interpreted across " + frames.size() + " frames");
+    log.debug("finished interpreting astm message as frames");
     return frames;
   }
 

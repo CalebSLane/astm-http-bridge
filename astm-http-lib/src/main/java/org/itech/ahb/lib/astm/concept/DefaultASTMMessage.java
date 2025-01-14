@@ -22,9 +22,7 @@ public class DefaultASTMMessage implements ASTMMessage {
    * @param message the message to parse into a series of ASTM records that will make up the message.
    */
   public DefaultASTMMessage(String message) {
-    records = Arrays.stream(message.split("((?<=\\n))"))
-      .map(e -> new DefaultASTMRecord(e))
-      .collect(Collectors.toList());
+    records = Arrays.stream(message.split("\\r?\\n")).map(e -> new DefaultASTMRecord(e)).collect(Collectors.toList());
   }
 
   /**
@@ -62,6 +60,9 @@ public class DefaultASTMMessage implements ASTMMessage {
 
   @Override
   public List<ASTMRecord> getRecords() {
+    if (records == null) {
+      return null;
+    }
     return Collections.unmodifiableList(records);
   }
 }

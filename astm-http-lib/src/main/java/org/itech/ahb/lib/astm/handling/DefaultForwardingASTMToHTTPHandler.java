@@ -59,6 +59,7 @@ public class DefaultForwardingASTMToHTTPHandler implements ASTMHandler {
   public ASTMHandlerResponse handle(ASTMMessage message) {
     HttpClient client = HttpClient.newHttpClient();
     log.debug("creating request to forward to http server at " + forwardingUri.toString());
+    log.trace("request: '" + message.getMessage() + "'");
     Builder requestBuilder = HttpRequest.newBuilder() //
       .uri(forwardingUri) //
       .POST(HttpRequest.BodyPublishers.ofString(message.getMessage())); //
