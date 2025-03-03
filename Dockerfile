@@ -2,14 +2,6 @@
 # Build Stage
 #
 FROM maven:3.9.7-eclipse-temurin-21-jammy AS build
-
-RUN --mount=target=/var/lib/apt/lists,type=cache,sharing=locked \
-  --mount=target=/var/cache/apt,type=cache,sharing=locked \
-  rm -f /etc/apt/apt.conf.d/docker-clean \
-  && apt-get -y update \
-  && apt-get -y --no-install-recommends install \
-  git
-
 ##
 # Copy Source Code and Build Dependencies
 #
@@ -42,7 +34,7 @@ RUN mkdir /app
 RUN chown astm:astm /app 
 
 
-#Deploy the war into tomcat image and point root to it
+#Deploy the jar into java image
 COPY --from=build /build/target/*.jar /app/astm-http-bridge.jar
 
 ADD healthcheck.sh /app/healthcheck.sh
