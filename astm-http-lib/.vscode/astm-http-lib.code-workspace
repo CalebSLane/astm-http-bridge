@@ -1,0 +1,16 @@
+{
+  "folders": [
+	{
+		"path": ".."
+	},
+	{
+		"path": "../.."
+	}
+],
+  "settings": {
+	"java.compile.nullAnalysis.mode": "automatic",
+    "java.project.sourcePaths": ["src/main/java"],
+	"java.completion.importOrder": ["#"],
+    "java.configuration.updateBuildConfiguration": "automatic"
+  }
+}
